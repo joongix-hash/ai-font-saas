@@ -13,6 +13,12 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-please-change-in-production")
 
+# OAuth 콜백 시 세션 쿠키가 정상 전달되도록 설정
+_IS_PRODUCTION = bool(os.getenv("RENDER", ""))
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = _IS_PRODUCTION
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Render.com 등 클라우드 환경에서는 /tmp 를 사용 (ephemeral), 로컬은 outputs/ 사용
 _RENDER = os.getenv("RENDER", "")
