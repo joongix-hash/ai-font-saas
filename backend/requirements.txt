@@ -1,0 +1,9 @@
+flask
+flask-sqlalchemy
+authlib
+requests
+google-genai
+pillow
+python-dotenv
+stripe
+gunicorn
