@@ -6,7 +6,12 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from datetime import datetime
-import os, uuid, io, math, traceback, zipfile, shutil, time, stripe
+import os, uuid, io, math, traceback, zipfile, shutil, time, stripe, json
+
+# ─── Module engines ───────────────────────────────────────────────────────────
+from modules.sprite_engine import generate_sprite_sheet
+from modules.pixel_engine  import convert_to_pixel_art, get_palette_hex
+from modules.ui_engine     import generate_9slice
 
 load_dotenv()
 
@@ -47,7 +52,15 @@ google_oauth = oauth.register(
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 FREE_CREDITS = 10
-CREDITS_PER_GENERATION = 1
+CREDITS_PER_GENERATION = 1   # font (AI)
+
+# Credit costs per tool
+TOOL_CREDITS = {
+    "font":   1,   # AI bitmap font (per generation)
+    "sprite": 2,   # sprite sheet packing
+    "pixel":  1,   # pixel art conversion
+    "ui":     1,   # 9-slice generator
+}
 PRIMARY_MODEL = "models/gemini-3.1-flash-image-preview"
 
 CREDIT_PACKAGES = {
@@ -440,6 +453,236 @@ def convert():
 @app.route("/outputs/<path:filename>")
 def output_file(filename):
     return send_from_directory(OUTPUT_FOLDER, filename)
+
+
+# ─── Sprite Sheet API ─────────────────────────────────────────────────────────
+@app.route("/api/sprite/generate", methods=["POST"])
+def api_sprite_generate():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    cost = TOOL_CREDITS["sprite"]
+    if user.credits < cost:
+        return jsonify({"error": f"크레딧이 부족합니다 (필요: {cost}, 현재: {user.credits})"}), 402
+
+    job_id   = uuid.uuid4().hex[:12]
+    job_path = os.path.join(OUTPUT_FOLDER, job_id)
+    os.makedirs(job_path, exist_ok=True)
+
+    try:
+        files = request.files.getlist("images")
+        if not files or all(f.filename == "" for f in files):
+            return jsonify({"error": "이미지를 최소 1개 이상 업로드해주세요."}), 400
+
+        pack_mode   = request.form.get("pack_mode", "tight")
+        padding     = int(request.form.get("padding", 2))
+        cell_w      = int(request.form.get("cell_w", 0))
+        cell_h      = int(request.form.get("cell_h", 0))
+        sort_by     = request.form.get("sort_by", "area")
+        pivot_x     = float(request.form.get("pivot_x", 0.5))
+        pivot_y     = float(request.form.get("pivot_y", 0.5))
+
+        saved_paths = []
+        for f in files:
+            if f.filename == "":
+                continue
+            ext = os.path.splitext(f.filename)[1].lower() or ".png"
+            p = os.path.join(job_path, f"src_{uuid.uuid4().hex[:6]}{ext}")
+            f.save(p)
+            saved_paths.append(p)
+
+        sheet, atlas = generate_sprite_sheet(
+            saved_paths,
+            pack_mode=pack_mode,
+            padding=padding,
+            cell_w=cell_w,
+            cell_h=cell_h,
+            sort_by=sort_by,
+            pivot_x=pivot_x,
+            pivot_y=pivot_y,
+        )
+
+        sheet_p   = os.path.join(job_path, "sheet.png")
+        atlas_p   = os.path.join(job_path, "atlas.json")
+        zip_name  = f"sprite_{job_id}.zip"
+        zip_p     = os.path.join(job_path, zip_name)
+
+        sheet.save(sheet_p)
+        with open(atlas_p, "w", encoding="utf-8") as f:
+            json.dump(atlas, f, ensure_ascii=False, indent=2)
+
+        with zipfile.ZipFile(zip_p, "w") as z:
+            z.write(sheet_p, arcname="sheet.png")
+            z.write(atlas_p, arcname="atlas.json")
+
+        user.credits -= cost
+        db.session.commit()
+        print(f"[SPRITE] user={user.email} -{cost} → {user.credits}")
+
+        return jsonify({
+            "job_id":       job_id,
+            "sheet_url":    f"/outputs/{job_id}/sheet.png",
+            "atlas_url":    f"/outputs/{job_id}/atlas.json",
+            "download_zip": f"/outputs/{job_id}/{zip_name}",
+            "frames":       len(atlas["frames"]),
+            "size":         atlas["meta"]["size"],
+            "credits_left": user.credits,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            safe_rmtree(job_path)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Pixel Art API ────────────────────────────────────────────────────────────
+@app.route("/api/pixel/convert", methods=["POST"])
+def api_pixel_convert():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    cost = TOOL_CREDITS["pixel"]
+    if user.credits < cost:
+        return jsonify({"error": f"크레딧이 부족합니다 (필요: {cost}, 현재: {user.credits})"}), 402
+
+    job_id   = uuid.uuid4().hex[:12]
+    job_path = os.path.join(OUTPUT_FOLDER, job_id)
+    os.makedirs(job_path, exist_ok=True)
+
+    try:
+        img_file = request.files.get("image")
+        if not img_file or img_file.filename == "":
+            return jsonify({"error": "이미지를 업로드해주세요."}), 400
+
+        pixel_size   = int(request.form.get("pixel_size", 8))
+        palette_size = int(request.form.get("palette_size", 16))
+        output_scale = int(request.form.get("output_scale", 4))
+        dither       = request.form.get("dither", "false").lower() == "true"
+        outline      = request.form.get("outline", "false").lower() == "true"
+
+        src_p = os.path.join(job_path, "src.png")
+        img_file.save(src_p)
+
+        result = convert_to_pixel_art(
+            src_p,
+            pixel_size=pixel_size,
+            palette_size=palette_size,
+            output_scale=output_scale,
+            dither=dither,
+            outline=outline,
+        )
+
+        out_p    = os.path.join(job_path, "pixel.png")
+        zip_name = f"pixel_{job_id}.zip"
+        zip_p    = os.path.join(job_path, zip_name)
+
+        result.save(out_p)
+
+        palette = get_palette_hex(result, max_colors=palette_size)
+
+        with zipfile.ZipFile(zip_p, "w") as z:
+            z.write(out_p, arcname="pixel.png")
+
+        user.credits -= cost
+        db.session.commit()
+        print(f"[PIXEL] user={user.email} -{cost} → {user.credits}")
+
+        return jsonify({
+            "job_id":       job_id,
+            "output_url":   f"/outputs/{job_id}/pixel.png",
+            "download_zip": f"/outputs/{job_id}/{zip_name}",
+            "size":         {"w": result.width, "h": result.height},
+            "palette":      palette,
+            "credits_left": user.credits,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            safe_rmtree(job_path)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── 9-Slice UI API ───────────────────────────────────────────────────────────
+@app.route("/api/ui/9slice", methods=["POST"])
+def api_ui_9slice():
+    user = current_user()
+    if not user:
+        return jsonify({"error": "로그인이 필요합니다."}), 401
+    cost = TOOL_CREDITS["ui"]
+    if user.credits < cost:
+        return jsonify({"error": f"크레딧이 부족합니다 (필요: {cost}, 현재: {user.credits})"}), 402
+
+    job_id   = uuid.uuid4().hex[:12]
+    job_path = os.path.join(OUTPUT_FOLDER, job_id)
+    os.makedirs(job_path, exist_ok=True)
+
+    try:
+        img_file = request.files.get("image")
+        if not img_file or img_file.filename == "":
+            return jsonify({"error": "이미지를 업로드해주세요."}), 400
+
+        auto_detect = request.form.get("auto_detect", "true").lower() == "true"
+        left   = request.form.get("left",   type=int)
+        right  = request.form.get("right",  type=int)
+        top    = request.form.get("top",    type=int)
+        bottom = request.form.get("bottom", type=int)
+
+        src_p = os.path.join(job_path, "src.png")
+        img_file.save(src_p)
+
+        preview, original, metadata = generate_9slice(
+            src_p,
+            auto_detect=auto_detect,
+            left=left,
+            right=right,
+            top=top,
+            bottom=bottom,
+        )
+
+        preview_p  = os.path.join(job_path, "preview.png")
+        meta_p     = os.path.join(job_path, "metadata.json")
+        zip_name   = f"9slice_{job_id}.zip"
+        zip_p      = os.path.join(job_path, zip_name)
+
+        preview.save(preview_p)
+        with open(meta_p, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+        with zipfile.ZipFile(zip_p, "w") as z:
+            z.write(src_p, arcname="source.png")
+            z.write(preview_p, arcname="preview.png")
+            z.write(meta_p, arcname="metadata.json")
+
+        user.credits -= cost
+        db.session.commit()
+        print(f"[9SLICE] user={user.email} -{cost} → {user.credits}")
+
+        slices = metadata["slice_lines"]
+        return jsonify({
+            "job_id":       job_id,
+            "preview_url":  f"/outputs/{job_id}/preview.png",
+            "source_url":   f"/outputs/{job_id}/src.png",
+            "meta_url":     f"/outputs/{job_id}/metadata.json",
+            "download_zip": f"/outputs/{job_id}/{zip_name}",
+            "slice_lines":  slices,
+            "source_size":  metadata["source_size"],
+            "credits_left": user.credits,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            safe_rmtree(job_path)
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
