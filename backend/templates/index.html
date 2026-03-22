@@ -180,14 +180,14 @@
 <!-- ── Header ────────────────────────────────────────────────── -->
 <header class="header">
     <span class="brand">CopyFont</span>
-    <span class="tagline">Pixel Game Asset Tools</span>
+    <span class="tagline" id="txt_tagline">Pixel Game Asset Tools</span>
     <div class="header-right">
         {% if user %}
         <div class="user-info">
             {% if user.picture %}<img src="{{ user.picture }}" alt="" class="user-avatar">{% endif %}
             <span class="user-name">{{ user.name }}</span>
             <span id="globalCredits" class="credits-badge {% if user.credits==0 %}empty{% elif user.credits<=3 %}low{% endif %}"
-                  onclick="openPricing()" title="충전하기">⚡ {{ user.credits }} 크레딧</span>
+                  onclick="openPricing()" title="충전하기" data-credits="{{ user.credits }}">⚡ {{ user.credits }} 크레딧</span>
             <a href="/logout" class="btn-logout">로그아웃</a>
         </div>
         {% else %}
@@ -211,19 +211,19 @@
         <div class="sidebar-label">Tools</div>
         <button class="tool-btn active" onclick="switchTool('font')" id="tab-font">
             <span class="tool-icon">🎨</span>
-            <span class="tool-info"><span class="tool-name">Bitmap Font</span><span class="tool-cost">1 크레딧/생성</span></span>
+            <span class="tool-info"><span class="tool-name" id="sb_t1">Bitmap Font</span><span class="tool-cost">1 credit</span></span>
         </button>
         <button class="tool-btn" onclick="switchTool('sprite')" id="tab-sprite">
             <span class="tool-icon">🎮</span>
-            <span class="tool-info"><span class="tool-name">Sprite Sheet</span><span class="tool-cost">2 크레딧/생성</span></span>
+            <span class="tool-info"><span class="tool-name" id="sb_t2">Sprite Sheet</span><span class="tool-cost">2 credits</span></span>
         </button>
         <button class="tool-btn" onclick="switchTool('pixel')" id="tab-pixel">
             <span class="tool-icon">🟦</span>
-            <span class="tool-info"><span class="tool-name">Pixel Art</span><span class="tool-cost">1 크레딧/생성</span></span>
+            <span class="tool-info"><span class="tool-name" id="sb_t3">Pixel Art</span><span class="tool-cost">1 credit</span></span>
         </button>
         <button class="tool-btn" onclick="switchTool('ui')" id="tab-ui">
             <span class="tool-icon">🔲</span>
-            <span class="tool-info"><span class="tool-name">9-Slice UI</span><span class="tool-cost">1 크레딧/생성</span></span>
+            <span class="tool-info"><span class="tool-name" id="sb_t4">9-Slice UI</span><span class="tool-cost">1 credit</span></span>
         </button>
         <hr class="sidebar-sep">
         <div class="sidebar-label">Account</div>
@@ -266,14 +266,14 @@
                 <div class="tool-header">
                     <div class="t-icon">🎨</div>
                     <div>
-                        <div class="t-name">Bitmap Font Generator</div>
-                        <div class="t-desc">레퍼런스 이미지 스타일을 복제해 게임 엔진용 BMFont 시트를 생성합니다.</div>
-                        <span class="t-badge">✨ AI Powered · 1 크레딧/생성</span>
+                        <div class="t-name" id="t1_name">Bitmap Font Generator</div>
+                        <div class="t-desc" id="t1_desc">Clone reference image style to generate BMFont sheets for game engines.</div>
+                        <span class="t-badge">✨ AI Powered · 1 credit</span>
                     </div>
                 </div>
 
                 {% if not user %}
-                <div class="alert alert-info">🎁 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!</div>
+                <div class="alert alert-info i18n-free">🎁 Sign in with Google to get <strong>10 free credits</strong>!</div>
                 {% endif %}
 
                 <div class="two-col">
@@ -282,11 +282,11 @@
                         <form id="fontForm" action="/convert" method="post" enctype="multipart/form-data" onsubmit="return startFontLoading()">
                             <div class="form-grid">
                                 <div class="field">
-                                    <label>레퍼런스 이미지</label>
+                                    <label id="lbl_ref">Reference Image</label>
                                     <input type="file" name="image" accept="image/*" required>
                                 </div>
                                 <div class="field">
-                                    <label>생성 모드</label>
+                                    <label id="lbl_mode">Generation Mode</label>
                                     <select name="mode" id="fontMode" onchange="toggleCustom()">
                                         <option value="numbers">숫자 (5×4) – 1280×1024</option>
                                         <option value="letters">영어 대소문자 (8×7)</option>
@@ -307,18 +307,18 @@
                                     <input type="range" name="tolerance" min="10" max="80" value="45" oninput="document.getElementById('tolVal').textContent=this.value">
                                 </div>
                                 <div class="field">
-                                    <label>폰트 이름</label>
+                                    <label id="lbl_fname">Font Name</label>
                                     <input type="text" name="font_name" value="BitmapFont" placeholder="BitmapFont">
                                 </div>
                                 <div class="field">
                                     {% if user %}
-                                    <button type="submit" id="fontSubmit" class="btn-gen">🎨 GENERATE BITMAP FONT</button>
+                                    <button type="submit" id="btn_font" class="btn-gen">🎨 GENERATE BITMAP FONT</button>
                                     {% else %}
-                                    <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;">🔒 로그인 후 생성하기</a>
+                                    <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;" id="btn_font">🔒 Sign in to Generate</a>
                                     {% endif %}
                                     <div id="fontLoading" class="loading-ui">
                                         <div class="prog-bg"><div id="fontProg" class="prog-fill"></div></div>
-                                        <div class="loading-txt">✨ AI가 스타일을 복제하는 중입니다... (20~60초)</div>
+                                        <div class="loading-txt" id="ltxt_font">✨ AI is cloning the style... (20~60s)</div>
                                     </div>
                                 </div>
                             </div>
@@ -354,7 +354,7 @@
                             </div>
                         </div>
                         {% if download_zip %}
-                        <a class="btn-dl" href="{{ url_for('output_file', filename=download_zip) }}">⬇ DOWNLOAD font.png + font.fnt (.zip)</a>
+                        <a id="dl_font_btn" class="btn-dl" href="{{ url_for('output_file', filename=download_zip) }}">⬇ DOWNLOAD font.png + font.fnt (.zip)</a>
                         {% endif %}
                     </div>
                 </div>
@@ -367,14 +367,14 @@
                 <div class="tool-header">
                     <div class="t-icon">🎮</div>
                     <div>
-                        <div class="t-name">Sprite Sheet Generator</div>
-                        <div class="t-desc">여러 이미지를 하나의 스프라이트 시트로 패킹합니다. TexturePacker 호환 JSON 아틀라스 출력.</div>
-                        <span class="t-badge">⚡ 2 크레딧/생성</span>
+                        <div class="t-name" id="t2_name">Sprite Sheet Generator</div>
+                        <div class="t-desc" id="t2_desc">Pack multiple images into a single sprite atlas. TexturePacker-compatible JSON output.</div>
+                        <span class="t-badge">⚡ 2 credits</span>
                     </div>
                 </div>
 
                 {% if not user %}
-                <div class="alert alert-info">🎁 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!</div>
+                <div class="alert alert-info i18n-free">🎁 Sign in with Google to get <strong>10 free credits</strong>!</div>
                 {% endif %}
 
                 <div class="two-col">
@@ -382,7 +382,7 @@
                         <div class="form-grid">
                             <!-- Multi-file Drop Zone -->
                             <div class="field">
-                                <label>스프라이트 이미지 (여러 개 선택 가능)</label>
+                                <label id="lbl_sprites">Sprite Images (multiple selection)</label>
                                 <div class="drop-zone" id="spriteDZ" onclick="document.getElementById('spriteFiles').click()"
                                      ondragover="dzDragOver(event,'spriteDZ')" ondragleave="dzDragLeave('spriteDZ')" ondrop="dzDrop(event,'spriteDZ','spriteFiles')">
                                     <div class="dz-icon">🗂</div>
@@ -395,14 +395,14 @@
 
                             <div class="row-2">
                                 <div class="field">
-                                    <label>패킹 방식</label>
+                                    <label id="lbl_pack">Pack Mode</label>
                                     <select id="spritePackMode">
                                         <option value="tight">Tight (MaxRects)</option>
-                                        <option value="grid">Grid (균일 셀)</option>
+                                        <option value="grid">Grid (uniform cells)</option>
                                     </select>
                                 </div>
                                 <div class="field">
-                                    <label>정렬 기준</label>
+                                    <label id="lbl_sort">Sort By</label>
                                     <select id="spriteSortBy">
                                         <option value="area">크기 순 (권장)</option>
                                         <option value="name">이름 순</option>
@@ -413,7 +413,7 @@
 
                             <div class="row-3">
                                 <div class="field">
-                                    <label>패딩 (px)</label>
+                                    <label id="lbl_padding">Padding (px)</label>
                                     <input type="number" id="spritePadding" value="2" min="0" max="32">
                                 </div>
                                 <div class="field">
@@ -439,13 +439,13 @@
 
                             <div class="field">
                                 {% if user %}
-                                <button class="btn-gen" onclick="generateSprite()" id="spriteSubmit">🎮 GENERATE SPRITE SHEET</button>
+                                <button class="btn-gen" onclick="generateSprite()" id="btn_sprite">🎮 GENERATE SPRITE SHEET</button>
                                 {% else %}
-                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;">🔒 로그인 후 생성하기</a>
+                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;" id="btn_sprite">🔒 Sign in to Generate</a>
                                 {% endif %}
                                 <div id="spriteLoading" class="loading-ui">
                                     <div class="prog-bg"><div id="spriteProg" class="prog-fill"></div></div>
-                                    <div class="loading-txt">🎮 스프라이트 시트 패킹 중...</div>
+                                    <div class="loading-txt" id="ltxt_sprite">🎮 Packing sprite sheet...</div>
                                 </div>
                             </div>
                         </div>
@@ -473,7 +473,7 @@
                         </div>
                         <div class="preview-info" id="spriteInfo"></div>
                         <div style="display:flex;gap:10px;">
-                            <a id="spriteDlBtn" class="btn-dl" href="#" style="flex:1;">⬇ DOWNLOAD sheet.png + atlas.json (.zip)</a>
+                            <a id="spriteDlBtn" class="btn-dl" href="#" style="flex:1;"><span id="dl_sprite_btn">⬇ DOWNLOAD sheet.png + atlas.json (.zip)</span></a>
                             <a id="spriteAtlasBtn" class="btn-dl" href="#" style="flex:0 0 140px;background:#374151;">📋 atlas.json</a>
                         </div>
                     </div>
@@ -487,21 +487,21 @@
                 <div class="tool-header">
                     <div class="t-icon">🟦</div>
                     <div>
-                        <div class="t-name">Pixel Art Converter</div>
-                        <div class="t-desc">모든 이미지를 픽셀아트 스타일로 변환합니다. Nearest-neighbor + 색상 팔레트 양자화.</div>
-                        <span class="t-badge">⚡ 1 크레딧/생성</span>
+                        <div class="t-name" id="t3_name">Pixel Art Converter</div>
+                        <div class="t-desc" id="t3_desc">Convert any image to pixel art style. Nearest-neighbor + color palette quantization.</div>
+                        <span class="t-badge">⚡ 1 credit</span>
                     </div>
                 </div>
 
                 {% if not user %}
-                <div class="alert alert-info">🎁 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!</div>
+                <div class="alert alert-info i18n-free">🎁 Sign in with Google to get <strong>10 free credits</strong>!</div>
                 {% endif %}
 
                 <div class="two-col">
                     <div class="card">
                         <div class="form-grid">
                             <div class="field">
-                                <label>원본 이미지</label>
+                                <label id="lbl_orig_pixel">Source Image</label>
                                 <div class="drop-zone" onclick="document.getElementById('pixelFile').click()">
                                     <div class="dz-icon">🖼</div>
                                     <div class="dz-label">클릭하여 이미지 선택</div>
@@ -558,13 +558,13 @@
 
                             <div class="field">
                                 {% if user %}
-                                <button class="btn-gen" onclick="generatePixel()" id="pixelSubmit">🟦 CONVERT TO PIXEL ART</button>
+                                <button class="btn-gen" onclick="generatePixel()" id="btn_pixel">🟦 CONVERT TO PIXEL ART</button>
                                 {% else %}
-                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;">🔒 로그인 후 변환하기</a>
+                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;" id="btn_pixel">🔒 Sign in to Convert</a>
                                 {% endif %}
                                 <div id="pixelLoading" class="loading-ui">
                                     <div class="prog-bg"><div id="pixelProg" class="prog-fill"></div></div>
-                                    <div class="loading-txt">🟦 픽셀아트로 변환 중...</div>
+                                    <div class="loading-txt" id="ltxt_pixel">🟦 Converting to pixel art...</div>
                                 </div>
                             </div>
                         </div>
@@ -599,7 +599,7 @@
                             <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">추출된 팔레트</div>
                             <div class="palette-row" id="pixelSwatches"></div>
                         </div>
-                        <a id="pixelDlBtn" class="btn-dl" href="#">⬇ DOWNLOAD pixel.png (.zip)</a>
+                        <a id="pixelDlBtn" class="btn-dl" href="#"><span id="dl_pixel_btn">⬇ DOWNLOAD pixel.png (.zip)</span></a>
                     </div>
                 </div>
             </div>
@@ -611,21 +611,21 @@
                 <div class="tool-header">
                     <div class="t-icon">🔲</div>
                     <div>
-                        <div class="t-name">UI 9-Slice Generator</div>
-                        <div class="t-desc">UI 요소 이미지를 9-슬라이스로 분할합니다. 자동 감지 또는 수동 설정 지원.</div>
-                        <span class="t-badge">⚡ 1 크레딧/생성</span>
+                        <div class="t-name" id="t4_name">UI 9-Slice Generator</div>
+                        <div class="t-desc" id="t4_desc">Split UI element images into 9-slice layout. Auto-detect or manual configuration.</div>
+                        <span class="t-badge">⚡ 1 credit</span>
                     </div>
                 </div>
 
                 {% if not user %}
-                <div class="alert alert-info">🎁 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!</div>
+                <div class="alert alert-info i18n-free">🎁 Sign in with Google to get <strong>10 free credits</strong>!</div>
                 {% endif %}
 
                 <div class="two-col">
                     <div class="card">
                         <div class="form-grid">
                             <div class="field">
-                                <label>UI 이미지 (버튼, 패널, 프레임 등)</label>
+                                <label id="lbl_ui_img">UI Image (button, panel, frame, etc.)</label>
                                 <div class="drop-zone" onclick="document.getElementById('uiFile').click()">
                                     <div class="dz-icon">🔲</div>
                                     <div class="dz-label">클릭하여 UI 이미지 선택</div>
@@ -653,13 +653,13 @@
 
                             <div class="field">
                                 {% if user %}
-                                <button class="btn-gen" onclick="generateUI9Slice()" id="uiSubmit">🔲 GENERATE 9-SLICE</button>
+                                <button class="btn-gen" onclick="generateUI9Slice()" id="btn_ui">🔲 GENERATE 9-SLICE</button>
                                 {% else %}
-                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;">🔒 로그인 후 생성하기</a>
+                                <a href="/auth/google" class="btn-gen" style="display:block;text-align:center;text-decoration:none;" id="btn_ui">🔒 Sign in to Generate</a>
                                 {% endif %}
                                 <div id="uiLoading" class="loading-ui">
                                     <div class="prog-bg"><div id="uiProg" class="prog-fill"></div></div>
-                                    <div class="loading-txt">🔲 9-슬라이스 분석 중...</div>
+                                    <div class="loading-txt" id="ltxt_ui">🔲 Analyzing 9-slice...</div>
                                 </div>
                             </div>
                         </div>
@@ -691,7 +691,7 @@
                         </div>
                         <div class="preview-info" id="uiInfo"></div>
                         <div style="display:flex;gap:10px;">
-                            <a id="uiDlBtn" class="btn-dl" href="#" style="flex:1;">⬇ DOWNLOAD preview + metadata.json (.zip)</a>
+                            <a id="uiDlBtn" class="btn-dl" href="#" style="flex:1;"><span id="dl_ui_btn">⬇ DOWNLOAD preview + metadata.json (.zip)</span></a>
                             <a id="uiMetaBtn" class="btn-dl" href="#" style="flex:0 0 140px;background:#374151;">📋 metadata.json</a>
                         </div>
                     </div>
@@ -737,12 +737,12 @@
 <div class="modal-overlay" id="pricingModal">
     <div class="modal-box">
         <button class="modal-close" onclick="closePricing()">✕</button>
-        <div class="modal-title">⚡ 크레딧 충전</div>
-        <div class="modal-sub">원하는 패키지를 선택하세요. 결제 즉시 크레딧이 추가됩니다.</div>
+        <div class="modal-title" id="modal_title">⚡ Buy Credits</div>
+        <div class="modal-sub" id="modal_sub">Choose a package. Credits are added instantly after payment.</div>
         {% if user %}
-        <div class="free-info">현재 보유: <strong>{{ user.credits }}개</strong></div>
+        <div class="free-info">Credits: <strong>{{ user.credits }}</strong></div>
         {% else %}
-        <div class="free-info">🎁 신규 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!</div>
+        <div class="free-info i18n-free">🎁 Sign in with Google to get <strong>10 free credits</strong>!</div>
         {% endif %}
         <div class="packages-grid">
             {% for key, pkg in credit_packages.items() %}
@@ -802,7 +802,7 @@ function toggleCustom() {
 }
 
 function startFontLoading() {
-    const sb = document.getElementById('fontSubmit');
+    const sb = document.getElementById('btn_font');
     if (sb) sb.disabled = true;
     document.getElementById('fontLoading').style.display = 'block';
     animateBar('fontProg');
@@ -817,7 +817,7 @@ async function generateSprite() {
     if (!files || files.length === 0) {
         alert('이미지를 최소 1개 업로드해주세요.'); return;
     }
-    const btn = document.getElementById('spriteSubmit');
+    const btn = document.getElementById('btn_sprite');
     btn.disabled = true;
     const loadEl = document.getElementById('spriteLoading');
     loadEl.style.display = 'block';
@@ -870,7 +870,7 @@ function onPixelFileChange() {
 async function generatePixel() {
     const file = document.getElementById('pixelFile').files[0];
     if (!file) { alert('이미지를 업로드해주세요.'); return; }
-    const btn = document.getElementById('pixelSubmit');
+    const btn = document.getElementById('btn_pixel');
     btn.disabled = true;
     const loadEl = document.getElementById('pixelLoading');
     loadEl.style.display = 'block';
@@ -937,7 +937,7 @@ function toggleSliceManual() {
 async function generateUI9Slice() {
     const file = document.getElementById('uiFile').files[0];
     if (!file) { alert('이미지를 업로드해주세요.'); return; }
-    const btn = document.getElementById('uiSubmit');
+    const btn = document.getElementById('btn_ui');
     btn.disabled = true;
     const loadEl = document.getElementById('uiLoading');
     loadEl.style.display = 'block';
@@ -1048,11 +1048,273 @@ function setRating(val) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   Multi-language (IP-based auto-detect)
+══════════════════════════════════════════════════════════════════ */
+const LANG = {
+    KR: {
+        /* Meta */
+        title:        "CopyFont – 픽셀 게임 에셋 툴",
+        tagline:      "픽셀 게임 에셋 올인원 툴킷",
+        /* Tool names */
+        t1_name:      "비트맵 폰트 생성기",
+        t1_desc:      "레퍼런스 이미지 스타일을 복제해 게임 엔진용 BMFont 시트를 생성합니다.",
+        t2_name:      "스프라이트 시트 생성기",
+        t2_desc:      "여러 이미지를 하나의 스프라이트 시트로 패킹합니다. TexturePacker 호환 JSON 아틀라스 출력.",
+        t3_name:      "픽셀 아트 변환기",
+        t3_desc:      "모든 이미지를 픽셀아트 스타일로 변환합니다. Nearest-neighbor + 색상 팔레트 양자화.",
+        t4_name:      "UI 9-슬라이스 생성기",
+        t4_desc:      "UI 요소 이미지를 9-슬라이스로 분할합니다. 자동 감지 또는 수동 설정 지원.",
+        /* Buttons */
+        btn_font:     "🎨 비트맵 폰트 생성하기",
+        btn_sprite:   "🎮 스프라이트 시트 생성하기",
+        btn_pixel:    "🟦 픽셀 아트로 변환하기",
+        btn_ui:       "🔲 9-슬라이스 생성하기",
+        btn_login:    "🔒 로그인 후 생성하기",
+        btn_charge:   "충전하기",
+        /* Labels */
+        lbl_ref:      "레퍼런스 이미지",
+        lbl_mode:     "생성 모드",
+        lbl_tol:      "배경 제거 오차",
+        lbl_fname:    "폰트 이름",
+        lbl_sprites:  "스프라이트 이미지 (여러 개 선택 가능)",
+        lbl_pack:     "패킹 방식",
+        lbl_sort:     "정렬 기준",
+        lbl_padding:  "패딩 (px)",
+        lbl_orig:     "원본 이미지",
+        lbl_ui_img:   "UI 이미지 (버튼, 패널, 프레임 등)",
+        /* Status */
+        loading_font:   "✨ AI가 스타일을 복제하는 중입니다... (20~60초)",
+        loading_sprite: "🎮 스프라이트 시트 패킹 중...",
+        loading_pixel:  "🟦 픽셀아트로 변환 중...",
+        loading_ui:     "🔲 9-슬라이스 분석 중...",
+        /* Pricing */
+        credit_label:   "크레딧",
+        modal_title:    "⚡ 크레딧 충전",
+        modal_sub:      "원하는 패키지를 선택하세요. 결제 즉시 크레딧이 추가됩니다.",
+        /* Free banner */
+        free_banner:    "🎁 Google 로그인 시 <strong>10회 무료 크레딧</strong> 제공!",
+        /* Download */
+        dl_font:    "⬇ DOWNLOAD font.png + font.fnt (.zip)",
+        dl_sprite:  "⬇ DOWNLOAD sheet.png + atlas.json (.zip)",
+        dl_pixel:   "⬇ DOWNLOAD pixel.png (.zip)",
+        dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
+    },
+    EN: {
+        title:        "CopyFont – Pixel Game Asset Tools",
+        tagline:      "All-in-one Pixel Game Asset Toolkit",
+        t1_name:      "Bitmap Font Generator",
+        t1_desc:      "Clone reference image style to generate BMFont sheets for game engines.",
+        t2_name:      "Sprite Sheet Generator",
+        t2_desc:      "Pack multiple images into a single sprite atlas. TexturePacker-compatible JSON output.",
+        t3_name:      "Pixel Art Converter",
+        t3_desc:      "Convert any image to pixel art style. Nearest-neighbor + color palette quantization.",
+        t4_name:      "UI 9-Slice Generator",
+        t4_desc:      "Split UI element images into 9-slice layout. Auto-detect or manual configuration.",
+        btn_font:     "🎨 GENERATE BITMAP FONT",
+        btn_sprite:   "🎮 GENERATE SPRITE SHEET",
+        btn_pixel:    "🟦 CONVERT TO PIXEL ART",
+        btn_ui:       "🔲 GENERATE 9-SLICE",
+        btn_login:    "🔒 Sign in to Generate",
+        btn_charge:   "Buy Credits",
+        lbl_ref:      "Reference Image",
+        lbl_mode:     "Generation Mode",
+        lbl_tol:      "BG Removal Tolerance",
+        lbl_fname:    "Font Name",
+        lbl_sprites:  "Sprite Images (multiple selection)",
+        lbl_pack:     "Pack Mode",
+        lbl_sort:     "Sort By",
+        lbl_padding:  "Padding (px)",
+        lbl_orig:     "Source Image",
+        lbl_ui_img:   "UI Image (button, panel, frame, etc.)",
+        loading_font:   "✨ AI is cloning the style... (20~60s)",
+        loading_sprite: "🎮 Packing sprite sheet...",
+        loading_pixel:  "🟦 Converting to pixel art...",
+        loading_ui:     "🔲 Analyzing 9-slice...",
+        credit_label:   "Credits",
+        modal_title:    "⚡ Buy Credits",
+        modal_sub:      "Choose a package. Credits are added instantly after payment.",
+        free_banner:    "🎁 Sign in with Google to get <strong>10 free credits</strong>!",
+        dl_font:    "⬇ DOWNLOAD font.png + font.fnt (.zip)",
+        dl_sprite:  "⬇ DOWNLOAD sheet.png + atlas.json (.zip)",
+        dl_pixel:   "⬇ DOWNLOAD pixel.png (.zip)",
+        dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
+    },
+    JA: {
+        title:        "CopyFont – ピクセルゲームアセットツール",
+        tagline:      "ピクセルゲームアセット オールインワンツール",
+        t1_name:      "ビットマップフォントジェネレーター",
+        t1_desc:      "参照画像のスタイルを複製してゲームエンジン用BMFontシートを生成します。",
+        t2_name:      "スプライトシートジェネレーター",
+        t2_desc:      "複数の画像を1枚のスプライトアトラスにパックします。TexturePacker互換JSON出力。",
+        t3_name:      "ピクセルアートコンバーター",
+        t3_desc:      "任意の画像をピクセルアートスタイルに変換します。",
+        t4_name:      "UI 9スライスジェネレーター",
+        t4_desc:      "UIイメージを9スライスに分割します。自動検出または手動設定。",
+        btn_font:     "🎨 ビットマップフォントを生成",
+        btn_sprite:   "🎮 スプライトシートを生成",
+        btn_pixel:    "🟦 ピクセルアートに変換",
+        btn_ui:       "🔲 9スライスを生成",
+        btn_login:    "🔒 ログインして生成",
+        btn_charge:   "クレジット購入",
+        lbl_ref:      "参照画像",
+        lbl_mode:     "生成モード",
+        lbl_tol:      "背景除去の許容値",
+        lbl_fname:    "フォント名",
+        lbl_sprites:  "スプライト画像（複数選択可）",
+        lbl_pack:     "パックモード",
+        lbl_sort:     "ソート順",
+        lbl_padding:  "パディング (px)",
+        lbl_orig:     "元画像",
+        lbl_ui_img:   "UI画像（ボタン、パネル、フレーム等）",
+        loading_font:   "✨ AIがスタイルを複製中... (20~60秒)",
+        loading_sprite: "🎮 スプライトシートをパック中...",
+        loading_pixel:  "🟦 ピクセルアートに変換中...",
+        loading_ui:     "🔲 9スライスを解析中...",
+        credit_label:   "クレジット",
+        modal_title:    "⚡ クレジット購入",
+        modal_sub:      "パッケージを選択してください。支払い後すぐにクレジットが追加されます。",
+        free_banner:    "🎁 Googleサインインで<strong>10クレジット無料</strong>プレゼント！",
+        dl_font:    "⬇ DOWNLOAD font.png + font.fnt (.zip)",
+        dl_sprite:  "⬇ DOWNLOAD sheet.png + atlas.json (.zip)",
+        dl_pixel:   "⬇ DOWNLOAD pixel.png (.zip)",
+        dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
+    },
+    ZH: {
+        title:        "CopyFont – 像素游戏资产工具",
+        tagline:      "像素游戏资产一站式工具包",
+        t1_name:      "位图字体生成器",
+        t1_desc:      "复制参考图片样式，生成游戏引擎用BMFont字体表。",
+        t2_name:      "精灵图生成器",
+        t2_desc:      "将多张图片打包成一张精灵图集。支持TexturePacker兼容JSON输出。",
+        t3_name:      "像素艺术转换器",
+        t3_desc:      "将任意图片转换为像素艺术风格。最近邻采样 + 调色板量化。",
+        t4_name:      "UI 九宫格生成器",
+        t4_desc:      "将UI图片分割为九宫格布局。支持自动检测或手动设置。",
+        btn_font:     "🎨 生成位图字体",
+        btn_sprite:   "🎮 生成精灵图",
+        btn_pixel:    "🟦 转换为像素艺术",
+        btn_ui:       "🔲 生成九宫格",
+        btn_login:    "🔒 登录后生成",
+        btn_charge:   "充值积分",
+        lbl_ref:      "参考图片",
+        lbl_mode:     "生成模式",
+        lbl_tol:      "背景去除容差",
+        lbl_fname:    "字体名称",
+        lbl_sprites:  "精灵图片（可多选）",
+        lbl_pack:     "打包方式",
+        lbl_sort:     "排序方式",
+        lbl_padding:  "间距 (px)",
+        lbl_orig:     "原始图片",
+        lbl_ui_img:   "UI图片（按钮、面板、边框等）",
+        loading_font:   "✨ AI正在复制样式... (20~60秒)",
+        loading_sprite: "🎮 正在打包精灵图...",
+        loading_pixel:  "🟦 正在转换像素艺术...",
+        loading_ui:     "🔲 正在分析九宫格...",
+        credit_label:   "积分",
+        modal_title:    "⚡ 充值积分",
+        modal_sub:      "选择套餐，支付后立即到账。",
+        free_banner:    "🎁 Google登录即送<strong>10积分</strong>免费体验！",
+        dl_font:    "⬇ 下载 font.png + font.fnt (.zip)",
+        dl_sprite:  "⬇ 下载 sheet.png + atlas.json (.zip)",
+        dl_pixel:   "⬇ 下载 pixel.png (.zip)",
+        dl_ui:      "⬇ 下载 preview + metadata.json (.zip)",
+    }
+};
+
+/* IP → 언어 코드 매핑 */
+const COUNTRY_LANG = {
+    KR:'KR', JP:'JA', CN:'ZH', TW:'ZH', HK:'ZH',
+    /* All others → EN */
+};
+
+let currentLang = 'EN';
+
+async function initLang() {
+    try {
+        // ipapi.co – free tier, no API key needed
+        const r = await fetch('https://ipapi.co/json/', {signal: AbortSignal.timeout(3000)});
+        const d = await r.json();
+        currentLang = COUNTRY_LANG[d.country_code] || 'EN';
+    } catch(e) {
+        currentLang = 'EN'; // fallback
+    }
+    applyLang(currentLang);
+}
+
+function applyLang(lang) {
+    const t = LANG[lang] || LANG['EN'];
+
+    // Page title & tagline
+    document.title = t.title;
+    const tgl = document.getElementById('txt_tagline');
+    if (tgl) tgl.textContent = t.tagline;
+
+    // Tool names & descriptions (sidebar + panel headers)
+    _setText('t1_name', t.t1_name); _setText('t1_desc', t.t1_desc);
+    _setText('t2_name', t.t2_name); _setText('t2_desc', t.t2_desc);
+    _setText('t3_name', t.t3_name); _setText('t3_desc', t.t3_desc);
+    _setText('t4_name', t.t4_name); _setText('t4_desc', t.t4_desc);
+
+    // Sidebar tool names
+    _setText('sb_t1', t.t1_name); _setText('sb_t2', t.t2_name);
+    _setText('sb_t3', t.t3_name); _setText('sb_t4', t.t4_name);
+
+    // Buttons
+    _setText('btn_font',   t.btn_font);
+    _setText('btn_sprite', t.btn_sprite);
+    _setText('btn_pixel',  t.btn_pixel);
+    _setText('btn_ui',     t.btn_ui);
+
+    // Labels
+    _setText('lbl_ref', t.lbl_ref);
+    _setText('lbl_mode', t.lbl_mode);
+    _setText('lbl_fname', t.lbl_fname);
+    _setText('lbl_sprites', t.lbl_sprites);
+    _setText('lbl_pack', t.lbl_pack);
+    _setText('lbl_sort', t.lbl_sort);
+    _setText('lbl_padding', t.lbl_padding);
+    _setText('lbl_orig_pixel', t.lbl_orig);
+    _setText('lbl_ui_img', t.lbl_ui_img);
+
+    // Loading texts
+    _setText('ltxt_font',   t.loading_font);
+    _setText('ltxt_sprite', t.loading_sprite);
+    _setText('ltxt_pixel',  t.loading_pixel);
+    _setText('ltxt_ui',     t.loading_ui);
+
+    // Modal
+    _setText('modal_title', t.modal_title);
+    _setText('modal_sub',   t.modal_sub);
+
+    // Download buttons
+    _setText('dl_font_btn',   t.dl_font);
+    _setText('dl_sprite_btn', t.dl_sprite);
+    _setText('dl_pixel_btn',  t.dl_pixel);
+    _setText('dl_ui_btn',     t.dl_ui);
+
+    // Free banner (innerHTML for <strong>)
+    document.querySelectorAll('.i18n-free').forEach(el => el.innerHTML = t.free_banner);
+
+    // Credits label
+    const gc = document.getElementById('globalCredits');
+    if (gc) {
+        const n = gc.dataset.credits || '0';
+        gc.textContent = '⚡ ' + n + ' ' + t.credit_label;
+    }
+}
+
+function _setText(id, text) {
+    const el = document.getElementById(id);
+    if (el && text) el.textContent = text;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    Init
 ══════════════════════════════════════════════════════════════════ */
 window.onload = () => {
     toggleCustom();
     toggleSliceManual();
+    initLang();  // async, non-blocking
 };
 </script>
 </body>
