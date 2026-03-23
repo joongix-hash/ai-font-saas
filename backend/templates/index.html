@@ -31,33 +31,30 @@
         .top-ad{background:#fff;border-bottom:1px solid #f3f4f6;text-align:center;padding:6px 0;min-height:70px;display:flex;align-items:center;justify-content:center;}
         .ad-ph{background:#f8fafc;border:1px dashed #cbd5e1;color:#94a3b8;font-size:11px;display:flex;align-items:center;justify-content:center;border-radius:4px;}
 
-        /* ── App Shell ────────────────────────── */
-        .app-shell{display:flex;height:calc(100vh - 58px - 70px);overflow:hidden;}
+        /* ── Top Nav Tabs ──────────────────────── */
+        .top-nav{background:#fff;border-bottom:2px solid #e5e7eb;padding:0 20px;position:sticky;top:58px;z-index:190;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+        .top-nav-inner{display:flex;gap:0;max-width:1360px;margin:0 auto;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        .top-nav-inner::-webkit-scrollbar{height:0;}
+        .top-tab{display:flex;align-items:center;gap:8px;padding:0 22px;height:50px;border:none;background:transparent;font-size:14px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowrap;flex-shrink:0;}
+        .top-tab:hover{color:#1e293b;background:#f8fafc;}
+        .top-tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#f0f6ff;}
+        .top-tab .tab-icon{font-size:17px;}
+        .top-tab .tab-cost{font-size:10px;color:#94a3b8;background:#f1f5f9;border-radius:20px;padding:1px 7px;font-weight:600;margin-left:4px;}
+        .top-tab.active .tab-cost{background:#dbeafe;color:#1d4ed8;}
+        @media(max-width:600px){.top-tab .tab-cost{display:none;} .top-tab{padding:0 14px;font-size:13px;}}
 
-        /* ── Tool Sidebar ─────────────────────── */
-        .tool-sidebar{width:200px;flex-shrink:0;background:#1e293b;display:flex;flex-direction:column;padding:12px 10px;gap:4px;overflow-y:auto;}
-        .sidebar-label{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.8px;padding:6px 6px 2px;}
-        .tool-btn{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:.15s;border:none;background:transparent;width:100%;text-align:left;color:#94a3b8;}
-        .tool-btn:hover{background:#334155;color:#e2e8f0;}
-        .tool-btn.active{background:#2563eb;color:#fff;}
-        .tool-btn .tool-icon{font-size:18px;flex-shrink:0;}
-        .tool-btn .tool-info{}
-        .tool-btn .tool-name{font-size:13px;font-weight:700;display:block;}
-        .tool-btn .tool-cost{font-size:10px;opacity:.7;display:block;margin-top:1px;}
-        .sidebar-sep{border:none;border-top:1px solid #334155;margin:6px 0;}
-
-        /* ── Content Area ─────────────────────── */
-        .content-area{flex:1;overflow-y:auto;background:#f0f2f5;display:flex;gap:0;}
-        .tool-panel{display:none;flex:1;padding:20px;min-width:0;}
+        /* ── Main Content ──────────────────────── */
+        .main-content{display:flex;background:#f0f2f5;min-height:calc(100vh - 58px - 50px);}
+        .content-area{flex:1;min-width:0;overflow-x:hidden;}
+        .tool-panel{display:none;padding:20px;min-width:0;}
         .tool-panel.active{display:block;}
 
         /* ── Right Ad Sidebar ─────────────────── */
         .right-ads{width:160px;flex-shrink:0;padding:12px 8px;display:flex;flex-direction:column;gap:10px;background:#f0f2f5;}
         @media(max-width:1100px){.right-ads{display:none;}}
-        @media(max-width:700px){.tool-sidebar{width:56px;} .tool-btn .tool-info{display:none;} .tool-btn{justify-content:center; padding:10px;}}
 
         /* ── Cards ────────────────────────────── */
-        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:18px;}
+        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:15px;}
         .card-dark{background:#1e293b;color:#fff;}
 
         /* ── Tool Header ──────────────────────── */
@@ -198,53 +195,42 @@
     </div>
 </header>
 
+<!-- ── Top Nav Tabs ────────────────────────────────────────────── -->
+<div class="top-nav">
+    <div class="top-nav-inner">
+        <button class="top-tab active" onclick="switchTool('font')" id="tab-font">
+            <span class="tab-icon">🎨</span>
+            <span id="sb_t1">Bitmap Font</span>
+            <span class="tab-cost">1 cr</span>
+        </button>
+        <button class="top-tab" onclick="switchTool('sprite')" id="tab-sprite">
+            <span class="tab-icon">🎮</span>
+            <span id="sb_t2">Sprite Sheet</span>
+            <span class="tab-cost">2 cr</span>
+        </button>
+        <button class="top-tab" onclick="switchTool('pixel')" id="tab-pixel">
+            <span class="tab-icon">🟦</span>
+            <span id="sb_t3">Pixel Art</span>
+            <span class="tab-cost">1 cr</span>
+        </button>
+        <button class="top-tab" onclick="switchTool('ui')" id="tab-ui">
+            <span class="tab-icon">🔲</span>
+            <span id="sb_t4">9-Slice UI</span>
+            <span class="tab-cost">1 cr</span>
+        </button>
+    </div>
+</div>
+
 <!-- ── Top Banner Ad ──────────────────────────────────────────── -->
 <div class="top-ad">
     <div class="ad-ph" style="width:728px;height:60px;max-width:100%;">Advertisement (728×60)</div>
 </div>
 
-<!-- ── App Shell ─────────────────────────────────────────────── -->
-<div class="app-shell">
-
-    <!-- ── Tool Sidebar ──────────────────────────────────────── -->
-    <nav class="tool-sidebar">
-        <div class="sidebar-label">Tools</div>
-        <button class="tool-btn active" onclick="switchTool('font')" id="tab-font">
-            <span class="tool-icon">🎨</span>
-            <span class="tool-info"><span class="tool-name" id="sb_t1">Bitmap Font</span><span class="tool-cost">1 credit</span></span>
-        </button>
-        <button class="tool-btn" onclick="switchTool('sprite')" id="tab-sprite">
-            <span class="tool-icon">🎮</span>
-            <span class="tool-info"><span class="tool-name" id="sb_t2">Sprite Sheet</span><span class="tool-cost">2 credits</span></span>
-        </button>
-        <button class="tool-btn" onclick="switchTool('pixel')" id="tab-pixel">
-            <span class="tool-icon">🟦</span>
-            <span class="tool-info"><span class="tool-name" id="sb_t3">Pixel Art</span><span class="tool-cost">1 credit</span></span>
-        </button>
-        <button class="tool-btn" onclick="switchTool('ui')" id="tab-ui">
-            <span class="tool-icon">🔲</span>
-            <span class="tool-info"><span class="tool-name" id="sb_t4">9-Slice UI</span><span class="tool-cost">1 credit</span></span>
-        </button>
-        <hr class="sidebar-sep">
-        <div class="sidebar-label">Account</div>
-        {% if user %}
-        <div style="padding:8px 8px 4px; font-size:12px; color:#94a3b8;">
-            <div style="color:#60a5fa; font-size:18px; font-weight:900;">⚡ {{ user.credits }}</div>
-            <div style="font-size:10px; margin-bottom:6px;">크레딧 잔액</div>
-            <button onclick="openPricing()" style="width:100%; background:#2563eb; color:#fff; border:none; border-radius:7px; padding:7px; font-size:11px; font-weight:700; cursor:pointer;">충전하기</button>
-        </div>
-        {% else %}
-        <div style="padding:8px;">
-            <a href="/auth/google" class="btn-google-login" style="font-size:11px; padding:7px 10px; justify-content:center;">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style="width:14px;"> 로그인
-            </a>
-        </div>
-        {% endif %}
-    </nav>
-
+<!-- ── Main Content ──────────────────────────────────────────── -->
+<div class="main-content">
     <!-- ── Content Area ───────────────────────────────────────── -->
     <div class="content-area">
-        <div style="flex:1; overflow-y:auto; padding-bottom:40px;">
+        <div style="padding-bottom:40px;">
 
             <!-- Global Alerts -->
             {% if error_message %}
@@ -725,7 +711,7 @@
         <div class="ad-ph" style="width:160px;height:250px;">Ad</div>
     </div>
 
-</div><!-- /app-shell -->
+</div><!-- /main-content -->
 
 <!-- ── Footer ─────────────────────────────────────────────────── -->
 <footer class="footer">
@@ -773,10 +759,12 @@
    Tool Tab Switching
 ══════════════════════════════════════════════════════════════════ */
 function switchTool(name) {
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.top-tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     document.getElementById('panel-' + name).classList.add('active');
+    // scroll to top of content
+    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 // Auto-switch to active tool on load based on server-rendered result
