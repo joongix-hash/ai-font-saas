@@ -350,6 +350,37 @@ def feedback():
         return render(success_message="💬 피드백을 보내주셔서 감사합니다!")
     return redirect(url_for("index"))
 
+# ─── SEO Routes ───────────────────────────────────────────────────────────────
+@app.route("/robots.txt")
+def robots_txt():
+    from flask import Response
+    content = """User-agent: *
+Allow: /
+Disallow: /outputs/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /checkout/
+Disallow: /payment/
+Disallow: /stripe/
+
+Sitemap: https://copyfont.onrender.com/sitemap.xml
+"""
+    return Response(content, mimetype="text/plain")
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    from flask import Response
+    content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://copyfont.onrender.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+"""
+    return Response(content, mimetype="application/xml")
+
 # ─── Main Routes ──────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
