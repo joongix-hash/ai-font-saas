@@ -21,30 +21,6 @@
     <meta name="twitter:title" content="CopyFont – Pixel Game Asset Tools">
     <meta name="twitter:description" content="AI bitmap font, sprite sheet, pixel art converter, 9-slice UI generator — all-in-one pixel game asset toolkit.">
     <meta name="twitter:image" content="https://copyfont.onrender.com/static/og-image.png">
-
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "CopyFont",
-      "url": "https://copyfont.onrender.com/",
-      "description": "AI-powered pixel game asset toolkit: bitmap font generator, sprite sheet packer, pixel art converter, and 9-slice UI generator.",
-      "applicationCategory": "DesignApplication",
-      "operatingSystem": "Web",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "KRW"
-      },
-      "featureList": [
-        "Bitmap Font Generator",
-        "Sprite Sheet Generator",
-        "Pixel Art Converter",
-        "9-Slice UI Generator"
-      ]
-    }
-    </script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1b;min-height:100vh;}
@@ -75,7 +51,7 @@
         .top-nav{background:#fff;border-bottom:2px solid #e5e7eb;padding:0 20px;position:sticky;top:58px;z-index:190;box-shadow:0 1px 3px rgba(0,0,0,.04);}
         .top-nav-inner{display:flex;gap:0;max-width:1360px;margin:0 auto;overflow-x:auto;-webkit-overflow-scrolling:touch;}
         .top-nav-inner::-webkit-scrollbar{height:0;}
-        .top-tab{display:flex;align-items:center;gap:8px;padding:0 22px;height:50px;border:none;background:transparent;font-size:14px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowraw;flex-shrink:0;}
+        .top-tab{display:flex;align-items:center;gap:8px;padding:0 22px;height:50px;border:none;background:transparent;font-size:14px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowrap;flex-shrink:0;}
         .top-tab:hover{color:#1e293b;background:#f8fafc;}
         .top-tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#f0f6ff;}
         .top-tab .tab-icon{font-size:17px;}
@@ -94,7 +70,7 @@
         @media(max-width:1100px){.right-ads{display:none;}}
 
         /* ── Cards ────────────────────────────── */
-        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:18px;}
+        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:15px;}
         .card-dark{background:#1e293b;color:#fff;}
 
         /* ── Tool Header ──────────────────────── */
@@ -198,7 +174,7 @@
         .btn-buy:hover{background:#1d4ed8;}
         .free-info{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:11px 15px;font-size:13px;color:#15803d;margin-bottom:18px;font-weight:600;}
 
-    0   /* ── Feedback ─────────────────────────── */
+        /* ── Feedback ─────────────────────────── */
         .stars{display:flex;gap:5px;margin-bottom:12px;}
         .star-btn{font-size:22px;cursor:pointer;background:none;border:none;color:#d1d5db;transition:color .15s;padding:0;}
         .star-btn.active,.star-btn:hover{color:#f59e0b;}
@@ -320,7 +296,7 @@
                                         <option value="custom">커스텀 모드</option>
                                     </select>
                                 </div>
-                                   <div id="custom_ui" class="custom-box">
+                                <div id="custom_ui" class="custom-box">
                                     <div class="field"><label>시트 업로드 (선택)</label><input type="file" name="custom_sheet" accept="image/*"></div>
                                     <div class="field"><label>글자 리스트</label><input type="text" name="custom_charset" placeholder="WINNER"></div>
                                     <div class="field row-2">
@@ -1067,7 +1043,7 @@ function updateGlobalCredits(n) {
 
 /* ══════════════════════════════════════════════════════════════════
    Star Rating
-═════════════════════════════════════════════════════════════════ */
+══════════════════════════════════════════════════════════════════ */
 function setRating(val) {
     document.getElementById('ratingInput').value = val;
     document.querySelectorAll('.star-btn').forEach(b => {
@@ -1169,11 +1145,11 @@ const LANG = {
     },
     JA: {
         title:        "CopyFont – ピクセルゲームアセットツール",
-        tagline:      "ピクセルゲームアセット オンルインワンツール",
+        tagline:      "ピクセルゲームアセット オールインワンツール",
         t1_name:      "ビットマップフォントジェネレーター",
-        t1_desc:      "参照画像のスタイルを複製してゲームエンジン用BMFon4シートを生成します。",
+        t1_desc:      "参照画像のスタイルを複製してゲームエンジン用BMFontシートを生成します。",
         t2_name:      "スプライトシートジェネレーター",
-        t2_desc:      "複数の画像を1枚のスプライトc��トラスにパックします。TexturePacker互換JSON出力。",
+        t2_desc:      "複数の画像を1枚のスプライトアトラスにパックします。TexturePacker互換JSON出力。",
         t3_name:      "ピクセルアートコンバーター",
         t3_desc:      "任意の画像をピクセルアートスタイルに変換します。",
         t4_name:      "UI 9スライスジェネレーター",
