@@ -31,7 +31,11 @@ OUTPUT_FOLDER = "/tmp/copyfont_outputs" if _RENDER else os.path.join(BASE_DIR, "
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # ─── Database ────────────────────────────────────────────────────────────────
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, 'copyfont.db')}"
+_db_url = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'copyfont.db')}")
+# SQLAlchemy requires postgresql:// not postgres://
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
