@@ -288,7 +288,7 @@ def checkout(package_key):
             line_items=[{
                 "price_data": {
                     "currency": "usd",
-                    "product_data": {"name": f"CopyFont {pkg['name']} Pack — {pkg['desc']}"},
+                    "product_data": {"name": f"PixelForge {pkg['name']} Pack — {pkg['desc']}"},
                     "unit_amount": pkg["price_cents"],
                 },
                 "quantity": 1,
@@ -363,7 +363,7 @@ Disallow: /checkout/
 Disallow: /payment/
 Disallow: /stripe/
 
-Sitemap: https://copyfont.onrender.com/sitemap.xml
+Sitemap: https://pixelforge.onrender.com/sitemap.xml
 """
     return Response(content, mimetype="text/plain")
 
@@ -373,7 +373,7 @@ def sitemap_xml():
     content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://copyfont.onrender.com/</loc>
+    <loc>https://pixelforge.onrender.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
