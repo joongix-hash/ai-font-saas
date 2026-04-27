@@ -28,7 +28,7 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 def redirect_to_https():
     if _IS_PRODUCTION and request.scheme == "http":
         url = request.url.replace("http://", "https://", 1)
-            return redirect(url, code=301)
+        return redirect(url, code=301)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Render.com 등 클라우드 환경에서는 /tmp 를 사용 (ephemeral), 로컬은 outputs/ 사용
