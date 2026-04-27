@@ -143,14 +143,25 @@ class Feedback(db.Model):
     email      = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-with app.app_context():
-    db.create_all()
+_db_available = False
+try:
+    with app.app_context():
+        db.create_all()
+    _db_available = True
+    print("[DB] Tables ready")
+except Exception as _db_err:
+    print(f"[DB] WARNING: Could not connect to DB: {_db_err}. App starting in limited mode.")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def current_user():
+    if not _db_available:
+        return None
     if "user_id" not in session:
         return None
-    return db.session.get(User, session["user_id"])
+    try:
+        return db.session.get(User, session["user_id"])
+    except Exception:
+        return None
 
 def safe_rmtree(path, retries=5, delay=0.3):
     for i in range(retries):
