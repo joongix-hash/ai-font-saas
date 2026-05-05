@@ -1,26 +1,64 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PixelForge – Pixel Game Asset Tools</title>
-    <meta name="description" content="AI bitmap font, sprite sheet, pixel art converter, 9-slice UI generator — all-in-one pixel game asset toolkit.">
-    <link rel="canonical" href="https://pixelforge.onrender.com/">
+
+    <!-- Google Analytics 4 (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-FNTN4YEV5X"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-FNTN4YEV5X');
+    </script>
+
+    <title>CopyPxl – AI Bitmap Font Generator for Unity, Godot & Phaser</title>
+    <meta name="description" content="Turn any reference image into a ready-to-use bitmap font sheet. AI generates a full BMFont-compatible character set (font.png + font.fnt) for Unity, Godot, Phaser, and LibGDX. Free to try.">
+    <meta name="keywords" content="bitmap font generator, BMFont generator, pixel art font, Unity font, Godot font, Phaser bitmap font, game font generator, AI font generator">
+    <link rel="canonical" href="https://copypxl.com/">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://pixelforge.onrender.com/">
-    <meta property="og:title" content="PixelForge – Pixel Game Asset Tools">
-    <meta property="og:description" content="AI bitmap font, sprite sheet, pixel art converter, 9-slice UI generator — all-in-one pixel game asset toolkit.">
-    <meta property="og:image" content="https://pixelforge.onrender.com/static/og-image.png">
-    <meta property="og:locale" content="ko_KR">
-    <meta property="og:site_name" content="PixelForge">
+    <meta property="og:url" content="https://copypxl.com/">
+    <meta property="og:title" content="CopyPxl – AI Bitmap Font Generator for Unity, Godot & Phaser">
+    <meta property="og:description" content="Turn any reference image into a ready-to-use bitmap font sheet. AI generates a full BMFont-compatible character set for Unity, Godot, Phaser, and LibGDX. Free to try.">
+    <meta property="og:image" content="https://copypxl.com/static/og-image.png">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:site_name" content="CopyPxl">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="PixelForge – Pixel Game Asset Tools">
-    <meta name="twitter:description" content="AI bitmap font, sprite sheet, pixel art converter, 9-slice UI generator — all-in-one pixel game asset toolkit.">
-    <meta name="twitter:image" content="https://pixelforge.onrender.com/static/og-image.png">
+    <meta name="twitter:site" content="@copypxl">
+    <meta name="twitter:title" content="CopyPxl – AI Bitmap Font Generator for Unity, Godot & Phaser">
+    <meta name="twitter:description" content="Turn any reference image into a bitmap font sheet — BMFont format, ready for Unity, Godot, Phaser. Free to try.">
+    <meta name="twitter:image" content="https://copypxl.com/static/og-image.png">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "CopyPxl",
+      "url": "https://copypxl.com/",
+      "description": "AI bitmap font generator. Upload any reference image and get a full BMFont-compatible character set for Unity, Godot, Phaser, and LibGDX.",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "AI Bitmap Font Generator",
+        "BMFont Format Output",
+        "Unity TextMesh Pro Compatible",
+        "Godot BitmapFont Compatible",
+        "Phaser Bitmap Font Compatible",
+        "Pixel Art Font Generator"
+      ]
+    }
+    </script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1b;min-height:100vh;}
@@ -70,7 +108,7 @@
         @media(max-width:1100px){.right-ads{display:none;}}
 
         /* ── Cards ────────────────────────────── */
-        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:15px;}
+        .card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.05);margin-bottom:18px;}
         .card-dark{background:#1e293b;color:#fff;}
 
         /* ── Tool Header ──────────────────────── */
@@ -185,16 +223,16 @@
         .btn-fb:hover{background:#334155;}
 
         /* ── Footer ───────────────────────────── */
+        .footer{text-align:center;padding:24px 20px;font-size:11px;color:#94a3b8;border-top:1px solid #e5e7eb;line-height:2;}
         .footer-biz{margin-top:8px;font-size:10px;color:#b0b8c9;}
-        .footer{text-align:center;padding:18px;font-size:11px;color:#94a3b8;border-top:1px solid #e5e7eb;}
     </style>
 </head>
 <body>
 
 <!-- ── Header ────────────────────────────────────────────────── -->
 <header class="header">
-    <span class="brand">PixelForge</span>
-    <span class="tagline" id="txt_tagline">Pixel Game Asset Tools</span>
+    <span class="brand">CopyPxl</span>
+    <span class="tagline" id="txt_tagline">Copy & Create Pixel Assets</span>
     <div class="header-right">
         {% if user %}
         <div class="user-info">
@@ -732,12 +770,12 @@
 
 <!-- ── Footer ─────────────────────────────────────────────────── -->
 <footer class="footer">
-    © 2026 PixelForge · Pixel Game Asset Tools ·
-    <a href="mailto:support@pixelforge.com" style="color:#94a3b8;">Contact</a>
-            <div class="footer-biz">
-                상호명: 준스튜디오 &nbsp;|&nbsp; 대표자: 민준기 &nbsp;|&nbsp; 사업자등록번호: 493-08-03530<br>
-                주소: 경기도 성남시 분당구 미금일로 86번길 1, 202호 &nbsp;|&nbsp; 전화: 010-2513-3732
-            </div>
+    © 2026 CopyPxl · Copy & Create Pixel Assets ·
+    <a href="mailto:support@copypxl.com" style="color:#94a3b8;">Contact</a>
+    <div class="footer-biz">
+        상호명: 준스튜디오 &nbsp;|&nbsp; 대표자: 민준기 &nbsp;|&nbsp; 사업자등록번호: 493-08-03530<br>
+        주소: 경기도 성남시 분당구 미금일로 86번길 1, 202호 &nbsp;|&nbsp; 전화: 010-2513-3732
+    </div>
 </footer>
 
 <!-- ── Pricing Modal ──────────────────────────────────────────── -->
@@ -1062,8 +1100,8 @@ function setRating(val) {
 const LANG = {
     KR: {
         /* Meta */
-        title:        "PixelForge – 픽셀 게임 에셋 툴",
-        tagline:      "픽셀 게임 에셋 올인원 툴킷",
+        title:        "CopyPxl – 픽셀 에셋 복제 툴",
+        tagline:      "레퍼런스에서 픽셀 에셋 복제",
         /* Tool names */
         t1_name:      "비트맵 폰트 생성기",
         t1_desc:      "레퍼런스 이미지 스타일을 복제해 게임 엔진용 BMFont 시트를 생성합니다.",
@@ -1109,8 +1147,8 @@ const LANG = {
         dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
     },
     EN: {
-        title:        "PixelForge – Pixel Game Asset Tools",
-        tagline:      "All-in-one Pixel Game Asset Toolkit",
+        title:        "CopyPxl – Copy & Create Pixel Assets",
+        tagline:      "Copy pixel assets from reference images",
         t1_name:      "Bitmap Font Generator",
         t1_desc:      "Clone reference image style to generate BMFont sheets for game engines.",
         t2_name:      "Sprite Sheet Generator",
@@ -1149,8 +1187,8 @@ const LANG = {
         dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
     },
     JA: {
-        title:        "PixelForge – ピクセルゲームアセットツール",
-        tagline:      "ピクセルゲームアセット オールインワンツール",
+        title:        "CopyPxl – ピクセルアセットコピーツール",
+        tagline:      "リファレンスからピクセルアセットをコピー",
         t1_name:      "ビットマップフォントジェネレーター",
         t1_desc:      "参照画像のスタイルを複製してゲームエンジン用BMFontシートを生成します。",
         t2_name:      "スプライトシートジェネレーター",
@@ -1189,8 +1227,8 @@ const LANG = {
         dl_ui:      "⬇ DOWNLOAD preview + metadata.json (.zip)",
     },
     ZH: {
-        title:        "PixelForge – 像素游戏资产工具",
-        tagline:      "像素游戏资产一站式工具包",
+        title:        "CopyPxl – 像素资产复制工具",
+        tagline:      "从参考图像复制像素资产",
         t1_name:      "位图字体生成器",
         t1_desc:      "复制参考图片样式，生成游戏引擎用BMFont字体表。",
         t2_name:      "精灵图生成器",
@@ -1289,42 +1327,4 @@ function applyLang(lang) {
     _setText('ltxt_font',   t.loading_font);
     _setText('ltxt_sprite', t.loading_sprite);
     _setText('ltxt_pixel',  t.loading_pixel);
-    _setText('ltxt_ui',     t.loading_ui);
-
-    // Modal
-    _setText('modal_title', t.modal_title);
-    _setText('modal_sub',   t.modal_sub);
-
-    // Download buttons
-    _setText('dl_font_btn',   t.dl_font);
-    _setText('dl_sprite_btn', t.dl_sprite);
-    _setText('dl_pixel_btn',  t.dl_pixel);
-    _setText('dl_ui_btn',     t.dl_ui);
-
-    // Free banner (innerHTML for <strong>)
-    document.querySelectorAll('.i18n-free').forEach(el => el.innerHTML = t.free_banner);
-
-    // Credits label
-    const gc = document.getElementById('globalCredits');
-    if (gc) {
-        const n = gc.dataset.credits || '0';
-        gc.textContent = '⚡ ' + n + ' ' + t.credit_label;
-    }
-}
-
-function _setText(id, text) {
-    const el = document.getElementById(id);
-    if (el && text) el.textContent = text;
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   Init
-══════════════════════════════════════════════════════════════════ */
-window.onload = () => {
-    toggleCustom();
-    toggleSliceManual();
-    initLang();  // async, non-blocking
-};
-</script>
-</body>
-</html>
+    _setText('ltxt_

@@ -39,3 +39,9 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Marketing / temp assets in root (not for repo)
+demo.gif
+demo.mp4
+reddit_*.png
+spri

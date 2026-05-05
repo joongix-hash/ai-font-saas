@@ -5,6 +5,5 @@ requests
 google-genai
 pillow
 python-dotenv
-stripe
 gunicorn
-psycopg2-binary
+psycopg2
