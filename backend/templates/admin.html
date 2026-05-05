@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>CopyPxl · Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0e1117;
+            --card: #161b22;
+            --card-hover: #1c232d;
+            --border: #21262d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #4493f8;
+            --green: #3fb950;
+            --gold: #f0b429;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+                         "Malgun Gothic", "맑은 고딕", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 16px 48px;
+        }
+        header {
+            max-width: 1200px;
+            margin: 0 auto 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        h1 .pill {
+            font-size: 11px;
+            background: var(--accent);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 999px;
+            margin-left: 8px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+        }
+        .meta {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .meta a {
+            color: var(--accent);
+            text-decoration: none;
+            margin-left: 12px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 18px;
+            transition: background .15s;
+        }
+        .card:hover { background: var(--card-hover); }
+        .card .label {
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 8px;
+        }
+        .card .value {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            font-variant-numeric: tabular-nums;
+        }
+        .card .sub {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .card.accent .value { color: var(--accent); }
+        .card.green .value { color: var(--green); }
+        .card.gold .value { color: var(--gold); }
+
+        .section-title {
+            font-size: 13px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin: 28px 0 10px;
+        }
+        .chart-wrap {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            height: 280px;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
+
+        .err {
+            background: #2d1414;
+            border: 1px solid #5a1f1f;
+            color: #ffb3b3;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .loading {
+            color: var(--muted);
+            text-align: center;
+            padding: 60px 0;
+            font-size: 14px;
+        }
+        button.refresh {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        button.refresh:hover { background: var(--card-hover); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>CopyPxl Admin <span class="pill">DASHBOARD</span></h1>
+        <div class="meta">
+            <span id="updated-at">로딩 중…</span>
+            <button class="refresh" onclick="loadStats()">새로고침</button>
+            <a href="/">↗ 사이트로</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="err-box"></div>
+        <div id="loading" class="loading">통계 불러오는 중…</div>
+
+        <div id="content" style="display:none">
+            <!-- 사용자 카드 -->
+            <div class="section-title">사용자 (가입자)</div>
+            <div class="grid">
+                <div class="card accent">
+                    <div class="label">누적 가입자</div>
+                    <div class="value" id="users-total">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">오늘 가입</div>
+                    <div class="value" id="users-today">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">최근 7일</div>
+                    <div class="value" id="users-week">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">최근 30일</div>
+                    <div class="value" id="users-month">—</div>
+                </div>
+            </div>
+
+            <!-- 매출 카드 -->
+            <div class="section-title">매출 (USD)</div>
+            <div class="grid">
+                <div class="card gold">
+                    <div class="label">누적 매출</div>
+                    <div class="value" id="rev-total">—</div>
+                    <div class="sub" id="rev-total-cnt">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">오늘 매출</div>
+                    <div class="value" id="rev-today">—</div>
+                    <div class="sub" id="rev-today-cnt">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">최근 7일</div>
+                    <div class="value" id="rev-week">—</div>
+                    <div class="sub" id="rev-week-cnt">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">최근 30일</div>
+                    <div class="value" id="rev-month">—</div>
+                    <div class="sub" id="rev-month-cnt">—</div>
+                </div>
+            </div>
+
+            <!-- 전환 카드 -->
+            <div class="section-title">전환율</div>
+            <div class="grid">
+                <div class="card green">
+                    <div class="label">결제한 사용자</div>
+                    <div class="value" id="conv-paid">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">전환율 (결제/가입)</div>
+                    <div class="value" id="conv-rate">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">총 결제 건수</div>
+                    <div class="value" id="pay-total">—</div>
+                </div>
+                <div class="card">
+                    <div class="label">평균 결제액</div>
+                    <div class="value" id="pay-avg">—</div>
+                </div>
+            </div>
+
+            <!-- 30일 추이 차트 -->
+            <div class="section-title">최근 30일 추이</div>
+            <div class="chart-grid">
+                <div class="chart-wrap"><canvas id="chart-signups"></canvas></div>
+                <div class="chart-wrap"><canvas id="chart-revenue"></canvas></div>
+            </div>
+
+            <!-- Coupon management -->
+            <div id="coupons-section" style="margin-top:32px;">
+                <div class="section-title">쿠폰 (인플루언서/캠페인 시드 크레딧)</div>
+
+                <div class="card" style="padding:18px;">
+                    <h3 style="margin-bottom:12px; font-size:14px; color:var(--muted);">새 쿠폰 발급</h3>
+                    <form id="coupon-form" style="display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                        <input name="code" placeholder="CODE (예: SEED-BRACKEYS)" required style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; text-transform:uppercase;">
+                        <input name="credits" type="number" min="1" max="10000" placeholder="크레딧 (예: 100)" required style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <input name="max_uses" type="number" min="0" placeholder="최대 사용 (빈칸=무제한)" style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <input name="note" placeholder="메모 (예: youtube-brackeys)" style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <input name="expires_at" type="datetime-local" style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <button type="submit" style="padding:8px 16px; background:var(--accent); color:#fff; border:0; border-radius:6px; cursor:pointer; font-weight:500; font-size:13px;">발급</button>
+                    </form>
+                    <div id="coupon-form-msg" style="margin-top:10px; font-size:12px;"></div>
+                </div>
+
+                <div class="card" style="padding:18px; margin-top:14px;">
+                    <h3 style="margin-bottom:12px; font-size:14px; color:var(--muted); display:flex; justify-content:space-between; align-items:center;">
+                        <span>발급된 쿠폰</span>
+                        <button onclick="loadCoupons()" style="padding:4px 10px; background:var(--card-hover); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer; font-size:11px;">새로고침</button>
+                    </h3>
+                    <div id="coupon-list" style="overflow-x:auto;">
+                        <div style="color:var(--muted); font-size:13px;">로딩…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual credit grant -->
+            <div id="grant-section" style="margin-top:32px;">
+                <div class="section-title">크레딧 직접 부여 (이메일 → 크레딧)</div>
+                <div class="card" style="padding:18px;">
+                    <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">
+                        DM에 "이메일 알려주시면 크레딧 드립니다" 답장 받은 이메일로 직접 부여. 사용 기록은 서버 로그.
+                    </p>
+                    <form id="grant-form" style="display:grid; gap:10px; grid-template-columns: 2fr 1fr 2fr auto;">
+                        <input name="email" type="email" placeholder="user@example.com" required style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <input name="credits" type="number" min="1" max="10000" placeholder="크레딧" required style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <input name="note" placeholder="메모 (예: seed-pixelartlucy)" style="padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px;">
+                        <button type="submit" style="padding:8px 16px; background:var(--green); color:#0e1117; border:0; border-radius:6px; cursor:pointer; font-weight:500; font-size:13px;">부여</button>
+                    </form>
+                    <div id="grant-form-msg" style="margin-top:10px; font-size:12px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let signupChart = null, revenueChart = null;
+
+        function fmtUSD(n) {
+            return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fmtNum(n) { return n.toLocaleString("en-US"); }
+
+        async function loadStats() {
+            const errBox  = document.getElementById("err-box");
+            const loading = document.getElementById("loading");
+            const content = document.getElementById("content");
+            errBox.innerHTML = "";
+
+            try {
+                const res = await fetch("/admin/stats", { credentials: "same-origin" });
+                if (res.status === 403) {
+                    errBox.innerHTML = '<div class="err">403 Forbidden — 어드민 계정으로 로그인해주세요.</div>';
+                    loading.style.display = "none";
+                    return;
+                }
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                const d = await res.json();
+
+                // 카드 채우기
+                document.getElementById("users-total").textContent = fmtNum(d.users.total);
+                document.getElementById("users-today").textContent = fmtNum(d.users.today);
+                document.getElementById("users-week").textContent  = fmtNum(d.users.week);
+                document.getElementById("users-month").textContent = fmtNum(d.users.month);
+
+                document.getElementById("rev-total").textContent = fmtUSD(d.payments.total_revenue_usd);
+                document.getElementById("rev-today").textContent = fmtUSD(d.payments.today_revenue_usd);
+                document.getElementById("rev-week").textContent  = fmtUSD(d.payments.week_revenue_usd);
+                document.getElementById("rev-month").textContent = fmtUSD(d.payments.month_revenue_usd);
+
+                document.getElementById("rev-total-cnt").textContent = fmtNum(d.payments.total_count) + "건";
+                document.getElementById("rev-today-cnt").textContent = fmtNum(d.payments.today_count) + "건";
+                document.getElementById("rev-week-cnt").textContent  = fmtNum(d.payments.week_count)  + "건";
+                document.getElementById("rev-month-cnt").textContent = fmtNum(d.payments.month_count) + "건";
+
+                document.getElementById("conv-paid").textContent  = fmtNum(d.conversion.paid_users);
+                document.getElementById("conv-rate").textContent  = d.conversion.rate_percent.toFixed(2) + "%";
+                document.getElementById("pay-total").textContent  = fmtNum(d.payments.total_count);
+                const avg = d.payments.total_count > 0
+                    ? d.payments.total_revenue_usd / d.payments.total_count : 0;
+                document.getElementById("pay-avg").textContent = fmtUSD(avg);
+
+                // 차트
+                const labels   = d.daily_signups.map(x => x.date.slice(5));
+                const signups  = d.daily_signups.map(x => x.count);
+                const revenues = d.daily_revenue.map(x => x.amount_usd);
+
+                drawChart("chart-signups", signups, labels, "신규 가입자", "#4493f8", "rgba(68,147,248,0.15)", 0);
+                drawChart("chart-revenue", revenues, labels, "매출 (USD)", "#f0b429", "rgba(240,180,41,0.15)", 1);
+
+                document.getElementById("updated-at").textContent =
+                    "업데이트: " + new Date().toLocaleString("ko-KR");
+
+                loading.style.display = "none";
+                content.style.display = "block";
+            } catch (e) {
+                errBox.innerHTML = '<div class="err">로드 실패: ' + (e.message || e) + '</div>';
+                loading.style.display = "none";
+            }
+        }
+
+        function drawChart(canvasId, data, labels, label, color, fill, idx) {
+            const ctx = document.getElementById(canvasId).getContext("2d");
+            const existing = idx === 0 ? signupChart : revenueChart;
+            if (existing) existing.destroy();
+            const chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: fill,
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: "#e6edf3" } },
+                        tooltip: { mode: "index", intersect: false },
+                    },
+                    scales: {
+                        x: { ticks: { color: "#8b949e", maxTicksLimit: 8 }, grid: { color: "#21262d" } },
+                        y: { ticks: { color: "#8b949e" }, grid: { color: "#21262d" }, beginAtZero: true },
+                    },
+                }
+            });
+            if (idx === 0) signupChart = chart; else revenueChart = chart;
+        }
+
+        // Coupon management
+        async function loadCoupons() {
+            const list = document.getElementById("coupon-list");
+            list.innerHTML = '<div style="color:var(--muted); font-size:13px;">로딩…</div>';
+            try {
+                const res = await fetch("/admin/coupons", { credentials: "same-origin" });
+                if (!res.ok) {
+                    list.innerHTML = '<div class="err">로드 실패: ' + res.status + '</div>';
+                    return;
+                }
+                const coupons = await res.json();
+                if (!coupons.length) {
+                    list.innerHTML = '<div style="color:var(--muted); font-size:13px;">아직 발급된 쿠폰 없음</div>';
+                    return;
+                }
+                let html = '<table style="width:100%; font-size:12px; border-collapse:collapse;">';
+                html += '<thead><tr style="border-bottom:1px solid var(--border); color:var(--muted); text-align:left;">'
+                     + '<th style="padding:6px 8px;">코드</th>'
+                     + '<th style="padding:6px 8px;">크레딧</th>'
+                     + '<th style="padding:6px 8px;">사용</th>'
+                     + '<th style="padding:6px 8px;">메모</th>'
+                     + '<th style="padding:6px 8px;">만료</th>'
+                     + '<th style="padding:6px 8px;">발급</th>'
+                     + '<th style="padding:6px 8px;">상태</th>'
+                     + '<th style="padding:6px 8px;">조작</th>'
+                     + '</tr></thead><tbody>';
+                for (const c of coupons) {
+                    const usesStr = (c.max_uses == null) ? (c.used_count + " / 무제한") : (c.used_count + " / " + c.max_uses);
+                    const expStr = c.expires_at ? new Date(c.expires_at).toLocaleDateString("ko-KR") : "-";
+                    const createdStr = c.created_at ? new Date(c.created_at).toLocaleDateString("ko-KR") : "-";
+                    const statusStr = c.is_active ? '<span style="color:var(--green);">활성</span>' : '<span style="color:var(--muted);">비활성</span>';
+                    html += '<tr style="border-bottom:1px solid var(--border);">'
+                         + '<td style="padding:6px 8px; font-family:monospace; font-weight:600;">' + escapeHtml(c.code) + '</td>'
+                         + '<td style="padding:6px 8px;">' + c.credits + '</td>'
+                         + '<td style="padding:6px 8px;">' + usesStr + '</td>'
+                         + '<td style="padding:6px 8px; color:var(--muted);">' + escapeHtml(c.note || "") + '</td>'
+                         + '<td style="padding:6px 8px;">' + expStr + '</td>'
+                         + '<td style="padding:6px 8px; color:var(--muted);">' + createdStr + '</td>'
+                         + '<td style="padding:6px 8px;">' + statusStr + '</td>'
+                         + '<td style="padding:6px 8px;">'
+                         + '<button onclick="toggleCoupon(' + c.id + ')" style="padding:3px 8px; background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:4px; cursor:pointer; font-size:11px;">'
+                         + (c.is_active ? '비활성화' : '활성화')
+                         + '</button> '
+                         + '<button onclick="deleteCoupon(' + c.id + ')" style="padding:3px 8px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:11px; margin-left:4px;">삭제</button>'
+                         + '</td></tr>';
+                }
+                html += '</tbody></table>';
+                list.innerHTML = html;
+            } catch (e) {
+                list.innerHTML = '<div class="err">로드 에러: ' + (e.message || e) + '</div>';
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"\']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+        }
+
+        async function toggleCoupon(id) {
+            const res = await fetch("/admin/coupons/" + id + "/toggle", { method: "POST", credentials: "same-origin" });
+            if (res.ok) loadCoupons(); else alert("토글 실패: " + res.status);
+        }
+
+        async function deleteCoupon(id) {
+            if (!confirm("이 쿠폰을 삭제하시겠습니까? (사용 기록 있으면 비활성화로 처리)")) return;
+            const res = await fetch("/admin/coupons/" + id, { method: "DELETE", credentials: "same-origin" });
+            if (res.ok) loadCoupons(); else alert("삭제 실패: " + res.status);
+        }
+
+        document.getElementById("coupon-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("coupon-form-msg");
+            const f = e.target;
+            const data = {
+                code: f.code.value.trim().toUpperCase(),
+                credits: parseInt(f.credits.value, 10) || 0,
+                max_uses: f.max_uses.value ? parseInt(f.max_uses.value, 10) : null,
+                note: f.note.value.trim() || null,
+                expires_at: f.expires_at.value || null,
+            };
+            msg.innerHTML = '<span style="color:var(--muted);">발급 중…</span>';
+            try {
+                const res = await fetch("/admin/coupons/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify(data),
+                });
+                const j = await res.json();
+                if (res.ok && j.ok) {
+                    msg.innerHTML = '<span style="color:var(--green);">✓ 발급됨: ' + escapeHtml(j.code) + '</span>';
+                    f.reset();
+                    loadCoupons();
+                } else {
+                    msg.innerHTML = '<span class="err">실패: ' + escapeHtml(j.error || "unknown") + (j.hint ? " (" + escapeHtml(j.hint) + ")" : "") + '</span>';
+                }
+            } catch (err) {
+                msg.innerHTML = '<span class="err">에러: ' + escapeHtml(err.message || err) + '</span>';
+            }
+        });
+
+        document.getElementById("grant-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("grant-form-msg");
+            const f = e.target;
+            const data = {
+                email: f.email.value.trim(),
+                credits: parseInt(f.credits.value, 10) || 0,
+                note: f.note.value.trim() || "manual seed",
+            };
+            msg.innerHTML = '<span style="color:var(--muted);">부여 중…</span>';
+            try {
+                const res = await fetch("/admin/credits/grant", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify(data),
+                });
+                const j = await res.json();
+                if (res.ok && j.ok) {
+                    msg.innerHTML = '<span style="color:var(--green);">✓ ' + escapeHtml(j.email) + ': +' + j.added + ' (잔액 ' + j.new_balance + ')</span>';
+                    f.reset();
+                } else {
+                    msg.innerHTML = '<span class="err">실패: ' + escapeHtml(j.error || "unknown") + '</span>';
+                }
+            } catch (err) {
+                msg.innerHTML = '<span class="err">에러: ' + escapeHtml(err.message || err) + '</span>';
+            }
+        });
+
+        loadStats();
+        loadCoupons();
+    </script>
+</body>
+</html>

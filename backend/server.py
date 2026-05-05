@@ -6,7 +6,10 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from datetime import datetime
-import os, uuid, io, math, traceback, zipfile, shutil, time, stripe, json
+import os, uuid, io, math, traceback, zipfile, shutil, time, json, requests as http_requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ─── Module engines ───────────────────────────────────────────────────────────
 from modules.sprite_engine import generate_sprite_sheet
@@ -16,24 +19,36 @@ from modules.ui_engine     import generate_9slice
 load_dotenv()
 
 app = Flask(__name__)
+
+# Cloud Run terminates TLS and forwards HTTP internally.
+# ProxyFix reads X-Forwarded-Proto so Flask/Authlib sees request.scheme == 'https'.
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-please-change-in-production")
 
 # OAuth 콜백 시 세션 쿠키가 정상 전달되도록 설정
-_IS_PRODUCTION = bool(os.getenv("RENDER", ""))
+# RENDER(Render.com) 또는 PRODUCTION(Cloud Run 등) 환경변수로 프로덕션 감지
+# Cloud Run automatically sets K_SERVICE; also support RENDER and PRODUCTION env vars
+_IS_PRODUCTION = bool(os.getenv("RENDER", "") or os.getenv("PRODUCTION", "") or os.getenv("K_SERVICE", ""))
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = _IS_PRODUCTION
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
+# ─── HTTP → HTTPS 강제 리다이렉트 (프로덕션 전용) ──────────────────────────────
 @app.before_request
 def redirect_to_https():
+    """Redirect HTTP requests to HTTPS in production.
+    Render terminates TLS and sets X-Forwarded-Proto; ProxyFix exposes it as request.scheme.
+    This ensures Google indexes only the canonical https:// URL."""
     if _IS_PRODUCTION and request.scheme == "http":
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Render.com 등 클라우드 환경에서는 /tmp 를 사용 (ephemeral), 로컬은 outputs/ 사용
-_RENDER = os.getenv("RENDER", "")
-OUTPUT_FOLDER = "/tmp/copyfont_outputs" if _RENDER else os.path.join(BASE_DIR, "outputs")
+# 클라우드 환경에서는 /tmp 를 사용 (ephemeral), 로컬은 outputs/ 사용
+_CLOUD = os.getenv("RENDER", "") or os.getenv("PRODUCTION", "")
+OUTPUT_FOLDER = "/tmp/copyfont_outputs" if _CLOUD else os.path.join(BASE_DIR, "outputs")
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # ─── Database ────────────────────────────────────────────────────────────────
@@ -43,12 +58,75 @@ if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql://", 1)
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# PostgreSQL용 연결 옵션 (Neon 서버리스 + Cloud Run 대응)
+# NullPool: 요청마다 새 연결 생성 — 서버리스 환경에서 끊긴 연결 재사용 방지
+if _db_url.startswith("postgresql"):
+    from sqlalchemy.pool import NullPool
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "poolclass": NullPool,       # 커넥션 풀 비활성화 (Neon 슬립/Cloud Run 스케일-아웃 대응)
+        "connect_args": {
+            "connect_timeout": 30,   # Neon 슬립 해제 대기 최대 30초
+            "sslmode": "require",
+        },
+    }
+
 db = SQLAlchemy(app)
 
-# ─── Stripe ──────────────────────────────────────────────────────────────────
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+# ─── PayPal ──────────────────────────────────────────────────────────────────
+PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "")
+PAYPAL_SECRET    = os.getenv("PAYPAL_SECRET", "")
+PAYPAL_MODE      = os.getenv("PAYPAL_MODE", "live")  # "live" or "sandbox"
+PAYPAL_API_BASE  = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
+
+def paypal_get_access_token():
+    resp = http_requests.post(
+        f"{PAYPAL_API_BASE}/v1/oauth2/token",
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+        data={"grant_type": "client_credentials"},
+        headers={"Accept": "application/json"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+def paypal_create_order(pkg, user_id, package_key, return_url, cancel_url):
+    token = paypal_get_access_token()
+    payload = {
+        "intent": "CAPTURE",
+        "purchase_units": [{
+            "amount": {
+                "currency_code": "USD",
+                "value": f"{pkg['price_cents'] / 100:.2f}",
+            },
+            "description": f"CopyPxl {pkg['name']} Pack – {pkg['desc']}",
+            "custom_id": f"{user_id}:{package_key}:{pkg['credits']}",
+        }],
+        "application_context": {
+            "return_url": return_url,
+            "cancel_url": cancel_url,
+            "brand_name": "CopyPxl",
+            "user_action": "PAY_NOW",
+        },
+    }
+    resp = http_requests.post(
+        f"{PAYPAL_API_BASE}/v2/checkout/orders",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def paypal_capture_order(order_id):
+    token = paypal_get_access_token()
+    resp = http_requests.post(
+        f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 # ─── Google OAuth ─────────────────────────────────────────────────────────────
 oauth = OAuth(app)
@@ -143,14 +221,64 @@ class Feedback(db.Model):
     email      = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Payment(db.Model):
+    id              = db.Column(db.Integer, primary_key=True)
+    user_id         = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    paypal_order_id = db.Column(db.String(100), unique=True, nullable=False)
+    package_key     = db.Column(db.String(50))
+    credits         = db.Column(db.Integer)
+    amount_cents    = db.Column(db.Integer)   # USD cents
+    currency        = db.Column(db.String(10), default="USD")
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Coupon(db.Model):
+    """Free credit seed/campaign coupon. For influencer collab SEED-XXXX codes."""
+    id           = db.Column(db.Integer, primary_key=True)
+    code         = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    credits      = db.Column(db.Integer, nullable=False)
+    max_uses     = db.Column(db.Integer)
+    used_count   = db.Column(db.Integer, default=0)
+    note         = db.Column(db.String(200))
+    expires_at   = db.Column(db.DateTime, nullable=True)
+    is_active    = db.Column(db.Boolean, default=True)
+    created_by   = db.Column(db.String(200))
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+
+class CouponRedemption(db.Model):
+    """Coupon usage log. One user can redeem the same coupon only once."""
+    id           = db.Column(db.Integer, primary_key=True)
+    coupon_id    = db.Column(db.Integer, db.ForeignKey("coupon.id"), nullable=False, index=True)
+    user_id      = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    credits      = db.Column(db.Integer, nullable=False)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("coupon_id", "user_id", name="uniq_coupon_user"),)
+
+# ─── Admin access control ─────────────────────────────────────────────────────
+ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "joongix@gmail.com").split(",") if e.strip()}
+
+def is_admin(user):
+    return bool(user and user.email and user.email.lower() in ADMIN_EMAILS)
+
+# DB 테이블 생성 — 빠른 실패 & graceful 처리
+# DB가 없어도 서버는 정상 시작됨 (로그인/크레딧 기능만 비활성화)
 _db_available = False
-try:
-    with app.app_context():
-        db.create_all()
-    _db_available = True
-    print("[DB] Tables ready")
-except Exception as _db_err:
-    print(f"[DB] WARNING: Could not connect to DB: {_db_err}. App starting in limited mode.")
+
+def _init_db(max_retries=2, delay=2):
+    global _db_available
+    for attempt in range(1, max_retries + 1):
+        try:
+            with app.app_context():
+                db.create_all()
+            print(f"[DB] Tables ready (attempt {attempt})")
+            _db_available = True
+            return
+        except Exception as e:
+            print(f"[DB] Connection failed (attempt {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                time.sleep(delay)
+    print("[DB] WARNING: Could not initialize DB. App starting in limited mode (login disabled).")
+
+_init_db()
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def current_user():
@@ -253,35 +381,96 @@ def render(template="index.html", **kwargs):
     kwargs.setdefault("mode_configs", MODE_CONFIGS)
     kwargs.setdefault("user", current_user())
     kwargs.setdefault("credit_packages", CREDIT_PACKAGES)
-    kwargs.setdefault("stripe_pk", STRIPE_PUBLISHABLE_KEY)
+    kwargs.setdefault("paypal_client_id", PAYPAL_CLIENT_ID)
     return render_template(template, **kwargs)
 
 # ─── Auth Routes ──────────────────────────────────────────────────────────────
 @app.route("/auth/google")
 def auth_google():
+    """Manual OAuth redirect — bypasses Authlib authorize_redirect which rewrites
+    the scheme to http:// even when given an explicit https:// URI on Cloud Run."""
     if not os.getenv("GOOGLE_CLIENT_ID"):
         return render(error_message="Google OAuth가 아직 설정되지 않았습니다. .env에 GOOGLE_CLIENT_ID를 추가해주세요.")
-    redirect_uri = url_for("auth_callback", _external=True)
-    return google_oauth.authorize_redirect(redirect_uri)
+    import secrets, urllib.parse
+    state = secrets.token_urlsafe(32)
+    session["oauth_state"] = state
+    redirect_uri = "https://copypxl.com/auth/callback" if _IS_PRODUCTION else url_for("auth_callback", _external=True)
+    params = {
+        "response_type": "code",
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "redirect_uri": redirect_uri,
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+    }
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return redirect(auth_url)
 
 @app.route("/auth/callback")
 def auth_callback():
+    """Manual token exchange — doesn't rely on Authlib session state."""
+    import urllib.parse
     try:
-        token = google_oauth.authorize_access_token()
-        info = token.get("userinfo")
-        if not info:
+        # CSRF check
+        returned_state = request.args.get("state", "")
+        stored_state = session.pop("oauth_state", None)
+        if not stored_state or returned_state != stored_state:
+            app.logger.warning("OAuth state mismatch: returned=%s stored=%s", returned_state, stored_state)
             return redirect(url_for("index"))
-        user = User.query.filter_by(google_id=info["sub"]).first()
+
+        code = request.args.get("code")
+        if not code:
+            return redirect(url_for("index"))
+
+        redirect_uri = "https://copypxl.com/auth/callback" if _IS_PRODUCTION else url_for("auth_callback", _external=True)
+
+        # Exchange code for tokens
+        token_resp = http_requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            app.logger.error("Token exchange failed: %s", token_data)
+            return redirect(url_for("index"))
+
+        # Get user info
+        userinfo_resp = http_requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        info = userinfo_resp.json()
+
+        user = User.query.filter_by(google_id=info.get("sub")).first()
         if not user:
             user = User(
-                google_id=info["sub"],
+                google_id=info.get("sub"),
                 email=info.get("email"),
                 name=info.get("name"),
                 picture=info.get("picture"),
-                credits=FREE_CREDITS
+                credits=FREE_CREDITS,
+                # Attribution: 세션에 저장된 first-touch utm/referrer를 영구 보존
+                referrer=session.get("referrer"),
+                utm_source=session.get("utm_source"),
+                utm_medium=session.get("utm_medium"),
+                utm_campaign=session.get("utm_campaign"),
+                utm_content=session.get("utm_content"),
+                utm_term=session.get("utm_term"),
             )
             db.session.add(user)
             db.session.commit()
+            # 한 번 사용한 attribution은 세션에서 제거 (이후 다른 유저와 섞이지 않게)
+            for _k in ("referrer", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"):
+                session.pop(_k, None)
         session["user_id"] = user.id
     except Exception:
         traceback.print_exc()
@@ -292,65 +481,121 @@ def logout():
     session.clear()
     return redirect(url_for("index"))
 
-# ─── Payment Routes ───────────────────────────────────────────────────────────
+# ─── Payment Routes (PayPal) ──────────────────────────────────────────────────
 @app.route("/checkout/<package_key>", methods=["POST"])
 def checkout(package_key):
     user = current_user()
     if not user:
         return render(error_message="결제를 위해 먼저 로그인해주세요.")
-    if not stripe.api_key:
+    if not PAYPAL_CLIENT_ID or not PAYPAL_SECRET:
         return render(error_message="결제 시스템이 아직 준비 중입니다.")
     pkg = CREDIT_PACKAGES.get(package_key)
     if not pkg:
         return "Invalid package", 400
     try:
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": "usd",
-                    "product_data": {"name": f"PixelForge {pkg['name']} Pack — {pkg['desc']}"},
-                    "unit_amount": pkg["price_cents"],
-                },
-                "quantity": 1,
-            }],
-            mode="payment",
-            success_url=url_for("payment_success", _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=url_for("index", _external=True),
-            metadata={
-                "user_id": str(user.id),
-                "package_key": package_key,
-                "credits": str(pkg["credits"]),
-            },
+        return_url = url_for("payment_success", _external=True)
+        cancel_url = url_for("index", _external=True)
+        order = paypal_create_order(pkg, user.id, package_key, return_url, cancel_url)
+        # 승인 URL로 리다이렉트
+        approve_url = next(
+            link["href"] for link in order["links"] if link["rel"] == "approve"
         )
-        return redirect(checkout_session.url)
+        return redirect(approve_url)
     except Exception as e:
+        traceback.print_exc()
         return render(error_message=f"결제 오류: {str(e)}")
 
 @app.route("/payment/success")
 def payment_success():
-    return render(success_message=f"✅ 결제가 완료되었습니다! 크레딧이 곧 추가됩니다.")
-
-@app.route("/stripe/webhook", methods=["POST"])
-def stripe_webhook():
-    payload = request.get_data()
-    sig = request.headers.get("Stripe-Signature", "")
+    order_id = request.args.get("token")  # PayPal returns ?token=ORDER_ID
+    if not order_id:
+        return render(error_message="결제 정보를 찾을 수 없습니다.")
     try:
-        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-    except Exception:
-        return "", 400
-    if event["type"] == "checkout.session.completed":
-        meta = event["data"]["object"].get("metadata", {})
-        try:
-            user = db.session.get(User, int(meta.get("user_id", 0)))
-            credits = int(meta.get("credits", 0))
+        capture = paypal_capture_order(order_id)
+        status = capture.get("status")
+        if status != "COMPLETED":
+            return render(error_message=f"결제가 완료되지 않았습니다 (status: {status})")
+
+        # custom_id 파싱: "user_id:package_key:credits"
+        custom_id = (
+            capture.get("purchase_units", [{}])[0]
+            .get("payments", {})
+            .get("captures", [{}])[0]
+            .get("custom_id", "")
+        )
+        parts = custom_id.split(":")
+        if len(parts) >= 3:
+            user_id_str, package_key, credits_str = parts[0], parts[1], parts[2]
+            user = db.session.get(User, int(user_id_str))
+            credits = int(credits_str)
             if user and credits > 0:
                 user.credits += credits
+                # 결제 기록 저장 (어드민 통계용) — 중복 INSERT 방지
+                try:
+                    pkg_info = CREDIT_PACKAGES.get(package_key, {})
+                    existing = db.session.query(Payment).filter_by(paypal_order_id=order_id).first()
+                    if not existing:
+                        payment = Payment(
+                            user_id=user.id,
+                            paypal_order_id=order_id,
+                            package_key=package_key,
+                            credits=credits,
+                            amount_cents=pkg_info.get("price_cents", 0),
+                            currency="USD",
+                        )
+                        db.session.add(payment)
+                except Exception as _pe:
+                    print(f"[PAYPAL] Payment record insert failed (non-fatal): {_pe}")
                 db.session.commit()
-                print(f"[STRIPE] 크레딧 추가: user={user.email} +{credits} → {user.credits}")
-        except Exception:
-            traceback.print_exc()
-    return "", 200
+                print(f"[PAYPAL] 크레딧 추가: user={user.email} +{credits} → {user.credits}")
+                return render(success_message=f"✅ 결제 완료! {credits} 크레딧이 추가되었습니다. (현재 잔여: {user.credits})")
+        return render(success_message="✅ 결제가 완료되었습니다! 크레딧이 추가됩니다.")
+    except Exception as e:
+        traceback.print_exc()
+        return render(error_message=f"결제 확인 오류: {str(e)}")
+
+# ─── Email Helper ─────────────────────────────────────────────────────────────
+def send_feedback_email(message, rating, sender_email, user_name):
+    """피드백을 이메일로 전송 (Gmail SMTP)"""
+    smtp_email    = os.getenv("SMTP_EMAIL", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    to_email      = os.getenv("FEEDBACK_TO_EMAIL", "joongix@gmail.com")
+
+    if not smtp_email or not smtp_password:
+        app.logger.warning("SMTP 설정 없음 — 이메일 전송 생략")
+        return
+
+    try:
+        stars = "⭐" * (rating or 0)
+        html_body = f"""
+<html><body style="font-family:sans-serif;max-width:600px;margin:auto;">
+  <h2 style="color:#4F46E5;">📬 CopyPxl 새 피드백</h2>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr><td style="padding:8px;font-weight:bold;color:#6B7280;">평점</td>
+        <td style="padding:8px;">{stars or "없음"} ({rating or "-"}점)</td></tr>
+    <tr style="background:#F9FAFB;"><td style="padding:8px;font-weight:bold;color:#6B7280;">보낸 사람</td>
+        <td style="padding:8px;">{user_name or "비로그인"} {f"({sender_email})" if sender_email else ""}</td></tr>
+    <tr><td style="padding:8px;font-weight:bold;color:#6B7280;">내용</td>
+        <td style="padding:8px;white-space:pre-wrap;">{message}</td></tr>
+    <tr style="background:#F9FAFB;"><td style="padding:8px;font-weight:bold;color:#6B7280;">시각</td>
+        <td style="padding:8px;">{datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}</td></tr>
+  </table>
+</body></html>
+"""
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[CopyPxl] 새 피드백 {stars}"
+        msg["From"]    = smtp_email
+        msg["To"]      = to_email
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, to_email, msg.as_string())
+
+        app.logger.info("피드백 이메일 전송 완료 → %s", to_email)
+    except Exception:
+        app.logger.error("피드백 이메일 전송 실패:\n%s", traceback.format_exc())
+
 
 # ─── Feedback Route ───────────────────────────────────────────────────────────
 @app.route("/feedback", methods=["POST"])
@@ -368,6 +613,12 @@ def feedback():
         )
         db.session.add(fb)
         db.session.commit()
+
+        # 이메일 알림 전송
+        user_name = user.name if user else None
+        sender_email = email or (user.email if user else "")
+        send_feedback_email(message, rating, sender_email, user_name)
+
         return render(success_message="💬 피드백을 보내주셔서 감사합니다!")
     return redirect(url_for("index"))
 
@@ -382,19 +633,22 @@ Disallow: /api/
 Disallow: /auth/
 Disallow: /checkout/
 Disallow: /payment/
-Disallow: /stripe/
+Disallow: /paypal/
 
-Sitemap: https://pixelforge.onrender.com/sitemap.xml
+Sitemap: https://copypxl.com/sitemap.xml
 """
     return Response(content, mimetype="text/plain")
 
 @app.route("/sitemap.xml")
 def sitemap_xml():
     from flask import Response
-    content = """<?xml version="1.0" encoding="UTF-8"?>
+    from datetime import datetime
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://pixelforge.onrender.com/</loc>
+    <loc>https://copypxl.com/</loc>
+    <lastmod>{today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -403,8 +657,23 @@ def sitemap_xml():
     return Response(content, mimetype="application/xml")
 
 # ─── Main Routes ──────────────────────────────────────────────────────────────
+_UTM_KEYS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
+
+def _capture_attribution_to_session():
+    """방문 시 URL의 utm_*과 referrer를 세션에 저장 (가입까진 first-touch로 보존)."""
+    for k in _UTM_KEYS:
+        v = (request.args.get(k) or "").strip()
+        if v and k not in session:
+            session[k] = v[:100]
+    if "referrer" not in session and request.referrer:
+        try:
+            session["referrer"] = request.referrer[:500]
+        except Exception:
+            pass
+
 @app.route("/")
 def index():
+    _capture_attribution_to_session()
     return render()
 
 @app.route("/convert", methods=["POST"])
@@ -736,5 +1005,278 @@ def api_ui_9slice():
         return jsonify({"error": str(e)}), 500
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+# ─── Admin Dashboard ──────────────────────────────────────────────────────────
+
+# ─── Influencer / Marketing short URLs ─────────────────────────────────────────
+GO_LINKS_PATH = os.path.join(BASE_DIR, "go_links.json")
+
+def _load_go_links():
+    """go_links.json을 매 요청마다 새로 읽어 변경 즉시 반영. 작은 파일이라 비용 미미."""
+    try:
+        with open(GO_LINKS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {k.lower(): v for k, v in data.items() if not k.startswith("_") and isinstance(v, dict)}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+@app.route("/go/<slug>")
+def go_redirect(slug):
+    """Short URL → UTM이 박힌 풀 URL로 302 리다이렉트.
+    인플루언서 협업 시 영상 설명란에 짧은 URL을 두기 위함."""
+    from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+
+    links = _load_go_links()
+    entry = links.get(slug.lower())
+    if not entry:
+        # 알 수 없는 slug — 홈으로
+        return redirect(url_for("index"), code=302)
+
+    target = entry.get("url") or "https://copypxl.com/"
+    utm_params = {k: v for k, v in entry.items() if k.startswith("utm_") and v}
+    if utm_params:
+        parts = urlparse(target)
+        existing = parse_qs(parts.query)
+        for k, v in utm_params.items():
+            existing[k] = [v]  # entry의 값으로 덮어쓰기
+        new_query = urlencode({k: v[0] for k, v in existing.items()})
+        target = urlunparse(parts._replace(query=new_query))
+
+    # GA4가 풀 URL의 utm을 자동 캡처하도록 풀 URL로 리다이렉트
+    return redirect(target, code=302)
+
+@app.route("/admin")
+def admin_page():
+    """어드민 대시보드 페이지 — joongix@gmail.com (또는 ADMIN_EMAILS) 만 접근 가능."""
+    user = current_user()
+    if not is_admin(user):
+        return redirect(url_for("auth_google", next="/admin")) if not user else ("Forbidden", 403)
+    return render_template("admin.html", user=user)
+
+
+@app.route("/admin/stats")
+def admin_stats():
+    """대시보드용 JSON 통계.
+
+    응답 구조:
+      users:   { total, today, week, month }
+      payments:{ total_count, today_count, total_revenue_usd, today_revenue_usd, week_revenue_usd, month_revenue_usd }
+      conversion: { paid_users, rate_percent }
+      daily_signups: [ {date, count}, ... 30 days ]
+      daily_revenue: [ {date, amount_usd}, ... 30 days ]
+    """
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+
+    if not _db_available:
+        return jsonify({"error": "db_unavailable"}), 503
+
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    week_start  = today_start - timedelta(days=7)
+    month_start = today_start - timedelta(days=30)
+
+    # 가입자
+    total_users = db.session.query(User).count()
+    today_users = db.session.query(User).filter(User.created_at >= today_start).count()
+    week_users  = db.session.query(User).filter(User.created_at >= week_start).count()
+    month_users = db.session.query(User).filter(User.created_at >= month_start).count()
+
+    # 결제 건수
+    total_payments = db.session.query(Payment).count()
+    today_payments = db.session.query(Payment).filter(Payment.created_at >= today_start).count()
+    week_payments  = db.session.query(Payment).filter(Payment.created_at >= week_start).count()
+    month_payments = db.session.query(Payment).filter(Payment.created_at >= month_start).count()
+
+    # 매출 (cents 합)
+    def _sum_cents(since=None):
+        q = db.session.query(func.coalesce(func.sum(Payment.amount_cents), 0))
+        if since is not None:
+            q = q.filter(Payment.created_at >= since)
+        return int(q.scalar() or 0)
+
+    total_rev_c = _sum_cents()
+    today_rev_c = _sum_cents(today_start)
+    week_rev_c  = _sum_cents(week_start)
+    month_rev_c = _sum_cents(month_start)
+
+    # 결제 전환율
+    paid_user_count = db.session.query(Payment.user_id).distinct().count()
+    conv_rate = round((paid_user_count / total_users * 100), 2) if total_users > 0 else 0.0
+
+    # 30일 일별 가입자
+    daily_signups = []
+    daily_revenue = []
+    for i in range(30):
+        day      = today_start - timedelta(days=29 - i)
+        next_day = day + timedelta(days=1)
+        sc = db.session.query(User).filter(User.created_at >= day, User.created_at < next_day).count()
+        rc = (db.session.query(func.coalesce(func.sum(Payment.amount_cents), 0))
+                .filter(Payment.created_at >= day, Payment.created_at < next_day).scalar() or 0)
+        date_str = day.strftime("%Y-%m-%d")
+        daily_signups.append({"date": date_str, "count": sc})
+        daily_revenue.append({"date": date_str, "amount_usd": round(int(rc) / 100, 2)})
+
+    return jsonify({
+        "generated_at_utc": now.isoformat() + "Z",
+        "users": {
+            "total": total_users,
+            "today": today_users,
+            "week":  week_users,
+            "month": month_users,
+        },
+        "payments": {
+            "total_count":       total_payments,
+            "today_count":       today_payments,
+            "week_count":        week_payments,
+            "month_count":       month_payments,
+            "total_revenue_usd": round(total_rev_c / 100, 2),
+            "today_revenue_usd": round(today_rev_c / 100, 2),
+            "week_revenue_usd":  round(week_rev_c  / 100, 2),
+            "month_revenue_usd": round(month_rev_c / 100, 2),
+        },
+        "conversion": {
+            "paid_users":   paid_user_count,
+            "rate_percent": conv_rate,
+        },
+        "daily_signups": daily_signups,
+        "daily_revenue": daily_revenue,
+    })
+
+# === Coupons (influencer/marketing seed credits) ==============================
+import re as _re_coupon
+
+_COUPON_CODE_RE = _re_coupon.compile(r"^[A-Z0-9_-]{3,50}$")
+
+@app.route("/api/coupon/redeem", methods=["POST"])
+def coupon_redeem():
+    """Logged-in user redeems a coupon code for credits."""
+    user = current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "login_required"}), 401
+    payload = request.get_json(silent=True) or request.form or {}
+    code = (payload.get("code") or "").strip().upper()
+    if not code:
+        return jsonify({"ok": False, "error": "code_required"}), 400
+    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
+    if not coupon:
+        return jsonify({"ok": False, "error": "invalid_code"}), 404
+    if coupon.expires_at and coupon.expires_at < datetime.utcnow():
+        return jsonify({"ok": False, "error": "expired"}), 400
+    if coupon.max_uses and (coupon.used_count or 0) >= coupon.max_uses:
+        return jsonify({"ok": False, "error": "max_uses_reached"}), 400
+    if CouponRedemption.query.filter_by(coupon_id=coupon.id, user_id=user.id).first():
+        return jsonify({"ok": False, "error": "already_redeemed"}), 400
+    user.credits = (user.credits or 0) + coupon.credits
+    coupon.used_count = (coupon.used_count or 0) + 1
+    db.session.add(CouponRedemption(coupon_id=coupon.id, user_id=user.id, credits=coupon.credits))
+    db.session.commit()
+    print(f"[COUPON] {user.email} redeemed {code} (+{coupon.credits} -> {user.credits})")
+    return jsonify({"ok": True, "credits_added": coupon.credits, "new_balance": user.credits})
+
+@app.route("/admin/coupons", methods=["GET"])
+def admin_coupons_list():
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    coupons = Coupon.query.order_by(Coupon.created_at.desc()).limit(500).all()
+    return jsonify([{
+        "id": c.id,
+        "code": c.code,
+        "credits": c.credits,
+        "max_uses": c.max_uses,
+        "used_count": c.used_count or 0,
+        "note": c.note,
+        "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+        "is_active": bool(c.is_active),
+        "created_by": c.created_by,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    } for c in coupons])
+
+@app.route("/admin/coupons/create", methods=["POST"])
+def admin_coupons_create():
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or request.form or {}
+    code = (data.get("code") or "").strip().upper()
+    try:
+        credits = int(data.get("credits", 0))
+    except (TypeError, ValueError):
+        credits = 0
+    raw_max = data.get("max_uses")
+    try:
+        max_uses = int(raw_max) if raw_max not in (None, "", 0, "0") else None
+    except (TypeError, ValueError):
+        max_uses = None
+    note = (data.get("note") or "").strip() or None
+    expires_iso = data.get("expires_at")
+    expires_at = None
+    if expires_iso:
+        try:
+            expires_at = datetime.fromisoformat(str(expires_iso).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            expires_at = None
+    if not code or not _COUPON_CODE_RE.match(code):
+        return jsonify({"error": "invalid_code", "hint": "A-Z, 0-9, _, - only. 3-50 chars"}), 400
+    if credits <= 0 or credits > 10000:
+        return jsonify({"error": "invalid_credits", "hint": "1-10000"}), 400
+    if Coupon.query.filter_by(code=code).first():
+        return jsonify({"error": "code_exists"}), 409
+    coupon = Coupon(
+        code=code, credits=credits, max_uses=max_uses, note=note,
+        expires_at=expires_at, created_by=user.email, is_active=True
+    )
+    db.session.add(coupon)
+    db.session.commit()
+    return jsonify({"ok": True, "id": coupon.id, "code": coupon.code})
+
+@app.route("/admin/coupons/<int:cid>/toggle", methods=["POST"])
+def admin_coupons_toggle(cid):
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    coupon = Coupon.query.get_or_404(cid)
+    coupon.is_active = not bool(coupon.is_active)
+    db.session.commit()
+    return jsonify({"ok": True, "is_active": coupon.is_active})
+
+@app.route("/admin/coupons/<int:cid>", methods=["DELETE"])
+def admin_coupons_delete(cid):
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    coupon = Coupon.query.get_or_404(cid)
+    if (coupon.used_count or 0) > 0:
+        coupon.is_active = False
+        db.session.commit()
+        return jsonify({"ok": True, "deactivated": True})
+    db.session.delete(coupon)
+    db.session.commit()
+    return jsonify({"ok": True, "deleted": True})
+
+@app.route("/admin/credits/grant", methods=["POST"])
+def admin_credits_grant():
+    """Admin manually grants credits to a user by email. For coupon-less seeds."""
+    user = current_user()
+    if not is_admin(user):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip().lower()
+    try:
+        amount = int(data.get("credits", 0))
+    except (TypeError, ValueError):
+        amount = 0
+    note = (data.get("note") or "manual seed").strip()[:200]
+    if not email or amount <= 0 or amount > 10000:
+        return jsonify({"error": "invalid_input"}), 400
+    target = User.query.filter(db.func.lower(User.email) == email).first()
+    if not target:
+        return jsonify({"error": "user_not_found"}), 404
+    target.credits = (target.credits or 0) + amount
+    db.session.commit()
+    print(f"[ADMIN_GRANT] {user.email} -> {target.email} +{amount} ({note}) -> {target.credits}")
+    return jsonify({"ok": True, "email": target.email, "added": amount, "new_balance": target.credits})
