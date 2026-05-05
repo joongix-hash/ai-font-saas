@@ -79,6 +79,25 @@
         .credits-badge.low{background:#fff7ed;border-color:#fed7aa;color:#c2410c;}
         .credits-badge.empty{background:#fef2f2;border-color:#fecaca;color:#b91c1c;}
         .btn-logout{font-size:12px;color:#94a3b8;text-decoration:none;padding:4px 8px;border-radius:6px;}
+        .btn-coupon{background:#fff;border:1px solid #d1d5db;color:#374151;font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer;font-weight:500;transition:.15s;}
+        .btn-coupon:hover{background:#f9fafb;border-color:#9ca3af;}
+        .coupon-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;}
+        .coupon-modal-bg.show{display:flex;}
+        .coupon-modal{background:#fff;border-radius:12px;padding:28px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,0.3);}
+        .coupon-modal h3{font-size:18px;font-weight:700;margin-bottom:8px;color:#0f172a;}
+        .coupon-modal p{font-size:13px;color:#64748b;margin-bottom:18px;line-height:1.5;}
+        .coupon-modal input{width:100%;padding:12px 14px;font-size:15px;font-family:monospace;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;border:2px solid #e5e7eb;border-radius:8px;outline:none;}
+        .coupon-modal input:focus{border-color:#2563eb;}
+        .coupon-modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+        .coupon-modal button{padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:0;}
+        .coupon-modal .btn-cancel{background:#f1f5f9;color:#475569;}
+        .coupon-modal .btn-cancel:hover{background:#e2e8f0;}
+        .coupon-modal .btn-submit{background:#2563eb;color:#fff;}
+        .coupon-modal .btn-submit:hover{background:#1d4ed8;}
+        .coupon-modal .btn-submit:disabled{background:#93c5fd;cursor:not-allowed;}
+        .coupon-modal-msg{margin-top:12px;font-size:13px;min-height:18px;}
+        .coupon-modal-msg.ok{color:#15803d;font-weight:600;}
+        .coupon-modal-msg.err{color:#b91c1c;}
         .btn-logout:hover{color:#64748b;background:#f1f5f9;}
 
         /* ── Top Ad ───────────────────────────── */
@@ -240,6 +259,7 @@
             <span class="user-name">{{ user.name }}</span>
             <span id="globalCredits" class="credits-badge {% if user.credits==0 %}empty{% elif user.credits<=3 %}low{% endif %}"
                   onclick="openPricing()" title="충전하기" data-credits="{{ user.credits }}">⚡ {{ user.credits }} 크레딧</span>
+            <button class="btn-coupon" onclick="openCouponModal()" title="쿠폰 코드 입력">🎫 쿠폰</button>
             <a href="/logout" class="btn-logout">로그아웃</a>
         </div>
         {% else %}
@@ -1327,4 +1347,97 @@ function applyLang(lang) {
     _setText('ltxt_font',   t.loading_font);
     _setText('ltxt_sprite', t.loading_sprite);
     _setText('ltxt_pixel',  t.loading_pixel);
-    _setText('ltxt_
+    _setText('ltxt_ui', t.loading_ui);
+}
+
+// === Coupon redeem ===========================================================
+function openCouponModal() {
+    var m = document.getElementById('coupon-modal');
+    if (!m) return;
+    m.classList.add('show');
+    var inp = document.getElementById('coupon-code-input');
+    if (inp) { inp.value = ''; setTimeout(function(){ inp.focus(); }, 50); }
+    var msg = document.getElementById('coupon-modal-msg');
+    if (msg) { msg.textContent = ''; msg.className = 'coupon-modal-msg'; }
+}
+function closeCouponModal() {
+    var m = document.getElementById('coupon-modal');
+    if (m) m.classList.remove('show');
+}
+async function submitCouponRedeem(ev) {
+    ev.preventDefault();
+    var msg = document.getElementById('coupon-modal-msg');
+    var btn = document.getElementById('coupon-submit-btn');
+    var inp = document.getElementById('coupon-code-input');
+    var code = (inp.value || '').trim().toUpperCase();
+    if (!code) { msg.className='coupon-modal-msg err'; msg.textContent='코드를 입력해주세요.'; return false; }
+    btn.disabled = true;
+    msg.className = 'coupon-modal-msg'; msg.textContent = '확인 중…';
+    try {
+        var res = await fetch('/api/coupon/redeem', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({code: code})
+        });
+        var j = await res.json().catch(function(){ return {}; });
+        if (res.ok && j.ok) {
+            msg.className = 'coupon-modal-msg ok';
+            msg.textContent = '✓ +' + j.credits_added + ' 크레딧 적립 (잔액 ' + j.new_balance + ')';
+            var badge = document.getElementById('globalCredits');
+            if (badge) {
+                badge.textContent = '⚡ ' + j.new_balance + ' 크레딧';
+                badge.dataset.credits = j.new_balance;
+                badge.classList.remove('empty', 'low');
+                if (j.new_balance == 0) badge.classList.add('empty');
+                else if (j.new_balance <= 3) badge.classList.add('low');
+            }
+            setTimeout(function(){ closeCouponModal(); }, 1800);
+        } else {
+            msg.className = 'coupon-modal-msg err';
+            var errMap = {
+                'login_required': '로그인이 필요합니다.',
+                'code_required': '코드를 입력해주세요.',
+                'invalid_code': '유효하지 않은 코드입니다.',
+                'expired': '만료된 코드입니다.',
+                'max_uses_reached': '이미 모두 사용된 코드입니다.',
+                'already_redeemed': '이미 사용한 코드입니다.'
+            };
+            msg.textContent = errMap[j.error] || ('실패: ' + (j.error || res.status));
+        }
+    } catch (err) {
+        msg.className = 'coupon-modal-msg err';
+        msg.textContent = '네트워크 오류: ' + (err.message || err);
+    } finally {
+        btn.disabled = false;
+    }
+    return false;
+}
+document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+        var m = document.getElementById('coupon-modal');
+        if (m && m.classList.contains('show')) closeCouponModal();
+    }
+});
+</script>
+
+{% if user %}
+<!-- Coupon redeem modal -->
+<div id="coupon-modal" class="coupon-modal-bg" onclick="if(event.target===this)closeCouponModal()">
+    <div class="coupon-modal">
+        <h3>🎫 쿠폰 코드 입력</h3>
+        <p>인플루언서 시드 코드 또는 캠페인 쿠폰을 입력하세요. 사용 시 즉시 크레딧이 적립됩니다.</p>
+        <form id="coupon-redeem-form" onsubmit="return submitCouponRedeem(event)">
+            <input type="text" id="coupon-code-input" name="code" placeholder="예: SEED-CREATOR" autocomplete="off" required>
+            <div id="coupon-modal-msg" class="coupon-modal-msg"></div>
+            <div class="coupon-modal-actions">
+                <button type="button" class="btn-cancel" onclick="closeCouponModal()">취소</button>
+                <button type="submit" class="btn-submit" id="coupon-submit-btn">적용</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+</body>
+</html>
