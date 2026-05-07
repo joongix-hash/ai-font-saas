@@ -276,6 +276,8 @@ def _init_db(max_retries=2, delay=2):
         try:
             with app.app_context():
                 db.create_all()
+                # Idempotent migrations — safe on re-run
+                _migrate_user_attribution()
             print(f"[DB] Tables ready (attempt {attempt})")
             _db_available = True
             return
@@ -284,6 +286,35 @@ def _init_db(max_retries=2, delay=2):
             if attempt < max_retries:
                 time.sleep(delay)
     print("[DB] WARNING: Could not initialize DB. App starting in limited mode (login disabled).")
+
+def _migrate_user_attribution():
+    """Add referrer + utm_* columns to user table if missing.
+    Postgres uses IF NOT EXISTS; safe to run on every boot."""
+    from sqlalchemy import text as sql_text
+    cols = [
+        ("referrer",      "VARCHAR(500)"),
+        ("utm_source",    "VARCHAR(100)"),
+        ("utm_medium",    "VARCHAR(50)"),
+        ("utm_campaign",  "VARCHAR(100)"),
+        ("utm_content",   "VARCHAR(100)"),
+        ("utm_term",      "VARCHAR(100)"),
+    ]
+    is_postgres = str(db.engine.url).startswith("postgresql")
+    try:
+        with db.engine.begin() as conn:
+            if is_postgres:
+                for col, ddl in cols:
+                    conn.execute(sql_text(f'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS {col} {ddl}'))
+            else:
+                # SQLite — check columns and add manually
+                rows = conn.execute(sql_text("PRAGMA table_info(user)")).fetchall()
+                existing = {r[1] for r in rows}
+                for col, ddl in cols:
+                    if col not in existing:
+                        conn.execute(sql_text(f"ALTER TABLE user ADD COLUMN {col} {ddl}"))
+        print("[DB] Migration: user attribution columns ensured")
+    except Exception as e:
+        print(f"[DB] Migration warning (non-fatal): {e}")
 
 _init_db()
 
