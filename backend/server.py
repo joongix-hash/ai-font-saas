@@ -212,6 +212,13 @@ class User(db.Model):
     picture    = db.Column(db.String(500))
     credits    = db.Column(db.Integer, default=FREE_CREDITS)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Attribution columns (filled at signup time from session.utm_*)
+    referrer       = db.Column(db.String(500))
+    utm_source     = db.Column(db.String(100))
+    utm_medium     = db.Column(db.String(50))
+    utm_campaign   = db.Column(db.String(100))
+    utm_content    = db.Column(db.String(100))
+    utm_term       = db.Column(db.String(100))
 
 class Feedback(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
