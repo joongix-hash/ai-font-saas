@@ -1,28 +1,16 @@
 {
-  "_comment": "Influencer/marketing short URL → UTM-tagged target. Slug is case-insensitive (lowercased on lookup).",
-  "_format": "slug: { url, utm_source, utm_medium, utm_campaign, utm_content?, utm_term? }",
-  "demo": {
-    "url": "https://copypxl.com/",
-    "utm_source": "shortlink",
-    "utm_medium": "direct-share",
-    "utm_campaign": "demo-2605"
-  },
-  "twitter": {
-    "url": "https://copypxl.com/",
-    "utm_source": "own-twitter",
-    "utm_medium": "social",
-    "utm_campaign": "launch-2605"
-  },
-  "reddit": {
-    "url": "https://copypxl.com/",
-    "utm_source": "reddit",
-    "utm_medium": "community",
-    "utm_campaign": "launch-2605"
-  },
-  "youtube": {
-    "url": "https://copypxl.com/",
-    "utm_source": "own-youtube",
-    "utm_medium": "social",
-    "utm_campaign": "launch-2605"
-  }
+  "_comment": "Influencer/marketing short URL → UTM-tagged target.",
+  "demo": {"url": "https://copypxl.com/", "utm_source": "shortlink", "utm_medium": "direct-share", "utm_campaign": "demo-2605"},
+  "twitter": {"url": "https://copypxl.com/", "utm_source": "own-twitter", "utm_medium": "social", "utm_campaign": "launch-2605"},
+  "reddit": {"url": "https://copypxl.com/", "utm_source": "reddit", "utm_medium": "community", "utm_campaign": "launch-2605"},
+  "youtube": {"url": "https://copypxl.com/", "utm_source": "own-youtube", "utm_medium": "social", "utm_campaign": "launch-2605"},
+  "orangepixel": {"url": "https://copypxl.com/", "utm_source": "twitter-orangepixel", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "adamyounis": {"url": "https://copypxl.com/", "utm_source": "youtube-adamyounis", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "bjgpixel": {"url": "https://copypxl.com/", "utm_source": "youtube-bjgpixel", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "goodgis": {"url": "https://copypxl.com/", "utm_source": "youtube-goodgis", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "heartbeast": {"url": "https://copypxl.com/", "utm_source": "youtube-heartbeast", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "gamefromscratch": {"url": "https://copypxl.com/", "utm_source": "youtube-gamefromscratch", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "jmbiv": {"url": "https://copypxl.com/", "utm_source": "youtube-jmbiv", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "iheartgd": {"url": "https://copypxl.com/", "utm_source": "youtube-iheartgamedev", "utm_medium": "influencer", "utm_campaign": "seed-2605"},
+  "gameendeavor": {"url": "https://copypxl.com/", "utm_source": "youtube-gameendeavor", "utm_medium": "influencer", "utm_campaign": "seed-2605"}
 }

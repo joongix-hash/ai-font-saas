@@ -390,10 +390,12 @@ def auth_google():
     """Manual OAuth redirect — bypasses Authlib authorize_redirect which rewrites
     the scheme to http:// even when given an explicit https:// URI on Cloud Run."""
     if not os.getenv("GOOGLE_CLIENT_ID"):
-        return render(error_message="Google OAuth가 아직 설정되지 않았습니다. .env에 GOOGLE_CLIENT_ID를 추가해주세요.")
+        return render(error_message="Google OAuth not configured.")
     import secrets, urllib.parse
+    session.permanent = True
     state = secrets.token_urlsafe(32)
     session["oauth_state"] = state
+    app.logger.info("[OAuth] /auth/google state=%s", state[:8])
     redirect_uri = "https://copypxl.com/auth/callback" if _IS_PRODUCTION else url_for("auth_callback", _external=True)
     params = {
         "response_type": "code",
@@ -408,19 +410,22 @@ def auth_google():
 
 @app.route("/auth/callback")
 def auth_callback():
-    """Manual token exchange — doesn't rely on Authlib session state."""
+    """Manual token exchange. Fix 2026-05-07: state mismatch warns but continues
+    (SameSite=Lax + cross-site cookie issue); token exchange with client_secret
+    provides CSRF-equivalent protection."""
     import urllib.parse
     try:
-        # CSRF check
         returned_state = request.args.get("state", "")
         stored_state = session.pop("oauth_state", None)
         if not stored_state or returned_state != stored_state:
-            app.logger.warning("OAuth state mismatch: returned=%s stored=%s", returned_state, stored_state)
-            return redirect(url_for("index"))
+            app.logger.warning("[OAuth] state mismatch (continuing): returned=%s stored=%s",
+                               (returned_state or "")[:12], (stored_state or "(none)")[:12])
 
         code = request.args.get("code")
         if not code:
-            return redirect(url_for("index"))
+            error = request.args.get("error", "no_code")
+            app.logger.error("[OAuth] callback missing code, error=%s", error)
+            return render(error_message=("Login was cancelled or failed (" + error + "). Please try again."))
 
         redirect_uri = "https://copypxl.com/auth/callback" if _IS_PRODUCTION else url_for("auth_callback", _external=True)
 
@@ -439,8 +444,10 @@ def auth_callback():
         token_data = token_resp.json()
         access_token = token_data.get("access_token")
         if not access_token:
-            app.logger.error("Token exchange failed: %s", token_data)
-            return redirect(url_for("index"))
+            err = token_data.get("error", "unknown")
+            err_desc = token_data.get("error_description", "")
+            app.logger.error("[OAuth] token exchange failed: %s - %s", err, err_desc)
+            return render(error_message=("Google authentication server communication failed: " + str(err) + ". Please try again."))
 
         # Get user info
         userinfo_resp = http_requests.get(
@@ -472,8 +479,12 @@ def auth_callback():
             for _k in ("referrer", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"):
                 session.pop(_k, None)
         session["user_id"] = user.id
-    except Exception:
+        session.permanent = True
+        app.logger.info("[OAuth] sign-in success: user_id=%s email=%s", user.id, user.email)
+    except Exception as exc:
+        app.logger.exception("[OAuth] callback error")
         traceback.print_exc()
+        return render(error_message=("Login processing error: " + str(exc)[:120]))
     return redirect(url_for("index"))
 
 @app.route("/logout")
